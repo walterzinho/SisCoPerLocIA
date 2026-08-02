@@ -1,28 +1,22 @@
----
-Task ID: 1
-Agent: Main Agent
-Task: Build Voice Profile Studio - Radio Announcer Voice Profile Creator with Gemini TTS
+### Task ID: 2 — Refactorización: IA Generation + Notion como repositorio
 
-Work Log:
-- Initialized fullstack development environment with Next.js 16, TypeScript, Tailwind CSS 4, shadcn/ui
-- Created i18n system with full Spanish/English translations
-- Created voice data file with all 30 Gemini TTS voices and their traits
-- Created audio tags reference with 24 tags across 5 categories (emotion, rhythm, vocal effect, creative, non-verbal) with bilingual descriptions and examples
-- Created 6 predefined templates (Noticiero, Magazine, Cultural, Deportivo, Matutino, Nocturno)
-- Built Zustand store for state management with localStorage persistence
-- Created Notion API route with 3 actions: test connection, create database, export profile
-- Built 7 UI components: Header, LanguageSwitcher, VoiceProfileForm, ProfilePreview, TagGuide, TemplateSelector, ProfileHistory, NotionSettings
-- Applied dark radio studio theme with red accents, zinc backgrounds, and radio-inspired design
-- Fixed i18n bug where `paces` was outside the `form` object
-- Fixed all components to use direct i18n import instead of store's `t()` method for SSR compatibility
-- Verified all features with Agent Browser: form filling, voice selection, pace dropdown, profile generation, save to history, template browsing, tag guide, settings, and language switching
+**Agent:** Main Agent
 
-Stage Summary:
-- Full application built and verified working at localhost:3000
-- All 5 tabs functional: Create Profile, Templates, History, Tag Guide, Settings
-- Bilingual support (ES/EN) working with language toggle
-- 30 voices, 24 audio tags, 6 templates available
-- Notion integration ready (API key + database creation + profile export)
-- Google AI Studio API key configuration available
-- Local storage persistence for profiles, settings, and language preference
-- Ready for deployment to Vercel
+**Work Log:**
+- Created `/api/generate` route: sends structured prompt to Gemini 2.0 Flash with system instructions, voice list, tag catalog, and pace options. Returns parsed JSON profile.
+- Rewrote `/api/notion` route: 5 actions (test token, test database, query profiles, export profile, update profile). Reads profiles FROM Notion with rich_text/title/select/number property extraction.
+- Rewrote `i18n.ts` with new translation keys for AI form (name, age, gender, profileType, region, scenario, additional), Notion settings (token + databaseId), and profiles tab.
+- Rewrote `store.ts` with simplified state: aiInput (7 fields), aiGenerated result, showEditor toggle, Notion profiles from API, editingPageId for updates.
+- Created `ai-profile-creator.tsx`: two-phase UI — (1) simple input form with AI generation button, (2) full editable profile editor with suggested tags, voice rationale, save to Notion.
+- Created `notion-profiles.tsx`: loads profiles from Notion database, displays as cards with Load as Template / Edit / Open in Notion actions.
+- Updated `notion-settings.tsx`: Token + Database ID with separate Test Token and Test Database buttons.
+- Updated `page.tsx`: 4 tabs (Crear con IA, Perfiles Notion, Guía de Etiquetas, Configuración).
+- Removed unused files: voice-profile-form.tsx, profile-history.tsx, template-selector.tsx, templates.ts.
+- Verified all tabs, language switching, and responsive layout with Agent Browser.
+
+**Stage Summary:**
+- App now generates voice profiles via Google Gemini AI from simple inputs (name, age, gender, type, region, scenario)
+- Notion is the primary repository: token + database ID, profiles read/write from Notion
+- Users can load any Notion profile as a template to edit and re-save
+- All 30 voices, 24 tags, bilingual ES/EN preserved
+- Dark radio studio theme preserved

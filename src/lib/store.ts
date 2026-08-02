@@ -2,12 +2,25 @@
 
 import { create } from 'zustand';
 import type { Locale } from './i18n';
-import { t as getTranslations } from './i18n';
 
-export interface VoiceProfile {
-  id: string;
+export interface NotionProfile {
+  pageId: string;
+  url: string;
   profileName: string;
   announcerName: string;
+  voice: string;
+  audioProfile: string;
+  style: string;
+  pace: string;
+  temperature: string;
+  scene: string;
+  sampleContext: string;
+  tag: string;
+  fullConfig: string;
+  createdAt: string;
+}
+
+interface AiGenerated {
   voice: string;
   audioProfile: string;
   style: string;
@@ -16,71 +29,81 @@ export interface VoiceProfile {
   scene: string;
   sampleContext: string;
   tag: string;
-  createdAt: string;
+  suggestedTags: string[];
+  voiceRationale: string;
 }
 
 interface AppState {
-  // Language
   locale: Locale;
   setLocale: (locale: Locale) => void;
 
-  // Form state
-  formData: Omit<VoiceProfile, 'id' | 'createdAt'>;
-  setFormField: <K extends keyof Omit<VoiceProfile, 'id' | 'createdAt'>>(field: K, value: Omit<VoiceProfile, 'id' | 'createdAt'>[K]) => void;
-  resetForm: () => void;
+  // AI input (simple form)
+  aiInput: {
+    name: string;
+    age: string;
+    gender: string;
+    profileType: string;
+    region: string;
+    scenario: string;
+    additional: string;
+  };
+  setAiInput: (field: string, value: string) => void;
+  resetAiInput: () => void;
 
-  // Generated profile text
+  // AI generation state
+  isGenerating: boolean;
+  setIsGenerating: (v: boolean) => void;
+  aiGenerated: AiGenerated | null;
+  setAiGenerated: (data: AiGenerated | null) => void;
+
+  // Editable profile (after AI generation or loading from Notion)
+  profileName: string;
+  setProfileName: (v: string) => void;
+  editField: <K extends keyof AiGenerated>(field: K, value: AiGenerated[K]) => void;
+
+  // Generated text for preview
   generatedText: string;
   setGeneratedText: (text: string) => void;
 
-  // History (local storage)
-  savedProfiles: VoiceProfile[];
-  loadProfiles: () => void;
-  saveProfile: (profile: VoiceProfile) => void;
-  deleteProfile: (id: string) => void;
-  loadProfileIntoForm: (profile: VoiceProfile) => void;
-
-  // Notion config
-  notionApiKey: string;
-  setNotionApiKey: (key: string) => void;
-  notionParentPageId: string;
-  setNotionParentPageId: (id: string) => void;
-  notionDatabaseName: string;
-  setNotionDatabaseName: (name: string) => void;
+  // Notion
+  notionToken: string;
+  setNotionToken: (v: string) => void;
   notionDatabaseId: string;
-  setNotionDatabaseId: (id: string) => void;
+  setNotionDatabaseId: (v: string) => void;
+  notionDbTitle: string;
+  setNotionDbTitle: (v: string) => void;
   loadNotionConfig: () => void;
+
+  // Notion profiles
+  notionProfiles: NotionProfile[];
+  setNotionProfiles: (p: NotionProfile[]) => void;
+  loadingProfiles: boolean;
+  setLoadingProfiles: (v: boolean) => void;
+
+  // Editing existing Notion profile
+  editingPageId: string | null;
+  setEditingPageId: (id: string | null) => void;
 
   // Google AI
   googleApiKey: string;
-  setGoogleApiKey: (key: string) => void;
+  setGoogleApiKey: (v: string) => void;
   loadGoogleConfig: () => void;
 
-  // Active tab
+  // UI state
   activeTab: string;
   setActiveTab: (tab: string) => void;
+  showEditor: boolean;
+  setShowEditor: (v: boolean) => void;
 
   // Toast
   toastMessage: string | null;
   toastType: 'success' | 'error' | null;
   showToast: (message: string, type: 'success' | 'error') => void;
   clearToast: () => void;
-
-  // Helper
-  t: () => ReturnType<typeof getTranslations>;
 }
 
-const emptyForm: Omit<VoiceProfile, 'id' | 'createdAt'> = {
-  profileName: '',
-  announcerName: '',
-  voice: '',
-  audioProfile: '',
-  style: '',
-  pace: 'moderate',
-  temperature: 0.5,
-  scene: '',
-  sampleContext: '',
-  tag: '',
+const emptyAiInput = {
+  name: '', age: '', gender: '', profileType: '', region: '', scenario: '', additional: '',
 };
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -90,69 +113,50 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ locale });
   },
 
-  formData: { ...emptyForm },
-  setFormField: (field, value) => set((s) => ({ formData: { ...s.formData, [field]: value } })),
-  resetForm: () => set({ formData: { ...emptyForm }, generatedText: '' }),
+  aiInput: { ...emptyAiInput },
+  setAiInput: (field, value) => set((s) => ({ aiInput: { ...s.aiInput, [field]: value } })),
+  resetAiInput: () => set({ aiInput: { ...emptyAiInput }, aiGenerated: null, generatedText: '', profileName: '', showEditor: false, editingPageId: null }),
+
+  isGenerating: false,
+  setIsGenerating: (v) => set({ isGenerating: v }),
+  aiGenerated: null,
+  setAiGenerated: (data) => set({ aiGenerated: data, showEditor: true }),
+
+  profileName: '',
+  setProfileName: (v) => set({ profileName: v }),
+  editField: (field, value) => {
+    const current = get().aiGenerated;
+    if (!current) return;
+    set({ aiGenerated: { ...current, [field]: value } });
+  },
 
   generatedText: '',
   setGeneratedText: (text) => set({ generatedText: text }),
 
-  savedProfiles: [],
-  loadProfiles: () => {
-    if (typeof window === 'undefined') return;
-    try {
-      const data = localStorage.getItem('vps-profiles');
-      if (data) set({ savedProfiles: JSON.parse(data) });
-    } catch { /* ignore */ }
-  },
-  saveProfile: (profile) => {
-    const updated = [profile, ...get().savedProfiles.filter(p => p.id !== profile.id)];
-    if (typeof window !== 'undefined') localStorage.setItem('vps-profiles', JSON.stringify(updated));
-    set({ savedProfiles: updated });
-  },
-  deleteProfile: (id) => {
-    const updated = get().savedProfiles.filter(p => p.id !== id);
-    if (typeof window !== 'undefined') localStorage.setItem('vps-profiles', JSON.stringify(updated));
-    set({ savedProfiles: updated });
-  },
-  loadProfileIntoForm: (profile) => {
-    set({
-      formData: {
-        profileName: profile.profileName,
-        announcerName: profile.announcerName,
-        voice: profile.voice,
-        audioProfile: profile.audioProfile,
-        style: profile.style,
-        pace: profile.pace,
-        temperature: profile.temperature,
-        scene: profile.scene,
-        sampleContext: profile.sampleContext,
-        tag: profile.tag,
-      },
-      activeTab: 'create',
-    });
-  },
-
-  notionApiKey: '',
-  setNotionApiKey: (key) => { if (typeof window !== 'undefined') localStorage.setItem('vps-notion-key', key); set({ notionApiKey: key }); },
-  notionParentPageId: '',
-  setNotionParentPageId: (id) => { if (typeof window !== 'undefined') localStorage.setItem('vps-notion-parent', id); set({ notionParentPageId: id }); },
-  notionDatabaseName: 'Perfiles de Locutores',
-  setNotionDatabaseName: (name) => { if (typeof window !== 'undefined') localStorage.setItem('vps-notion-dbname', name); set({ notionDatabaseName: name }); },
+  notionToken: '',
+  setNotionToken: (v) => { if (typeof window !== 'undefined') localStorage.setItem('vps-notion-token', v); set({ notionToken: v }); },
   notionDatabaseId: '',
-  setNotionDatabaseId: (id) => { if (typeof window !== 'undefined') localStorage.setItem('vps-notion-db-id', id); set({ notionDatabaseId: id }); },
+  setNotionDatabaseId: (v) => { if (typeof window !== 'undefined') localStorage.setItem('vps-notion-db-id', v); set({ notionDatabaseId: v }); },
+  notionDbTitle: '',
+  setNotionDbTitle: (v) => set({ notionDbTitle: v }),
   loadNotionConfig: () => {
     if (typeof window === 'undefined') return;
     set({
-      notionApiKey: localStorage.getItem('vps-notion-key') || '',
-      notionParentPageId: localStorage.getItem('vps-notion-parent') || '',
-      notionDatabaseName: localStorage.getItem('vps-notion-dbname') || 'Perfiles de Locutores',
+      notionToken: localStorage.getItem('vps-notion-token') || '',
       notionDatabaseId: localStorage.getItem('vps-notion-db-id') || '',
     });
   },
 
+  notionProfiles: [],
+  setNotionProfiles: (p) => set({ notionProfiles: p }),
+  loadingProfiles: false,
+  setLoadingProfiles: (v) => set({ loadingProfiles: v }),
+
+  editingPageId: null,
+  setEditingPageId: (id) => set({ editingPageId: id }),
+
   googleApiKey: '',
-  setGoogleApiKey: (key) => { if (typeof window !== 'undefined') localStorage.setItem('vps-google-key', key); set({ googleApiKey: key }); },
+  setGoogleApiKey: (v) => { if (typeof window !== 'undefined') localStorage.setItem('vps-google-key', v); set({ googleApiKey: v }); },
   loadGoogleConfig: () => {
     if (typeof window === 'undefined') return;
     set({ googleApiKey: localStorage.getItem('vps-google-key') || '' });
@@ -160,6 +164,8 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   activeTab: 'create',
   setActiveTab: (tab) => set({ activeTab: tab }),
+  showEditor: false,
+  setShowEditor: (v) => set({ showEditor: v }),
 
   toastMessage: null,
   toastType: null,
@@ -168,21 +174,25 @@ export const useAppStore = create<AppState>((set, get) => ({
     setTimeout(() => set({ toastMessage: null, toastType: null }), 3500);
   },
   clearToast: () => set({ toastMessage: null, toastType: null }),
-
-  t: () => getTranslations(get().locale),
 }));
 
-export function generateProfileText(profile: Omit<VoiceProfile, 'id' | 'createdAt'>, voiceName: string, voiceTrait: string): string {
+export function buildProfileText(
+  profileName: string,
+  announcerName: string,
+  data: { voice: string; audioProfile: string; style: string; pace: string; temperature: number; scene: string; sampleContext: string; tag: string },
+  voiceName: string,
+  voiceTrait: string,
+): string {
   const lines = [
-    `${profile.profileName} - ${profile.announcerName}`,
+    `${profileName} - ${announcerName}`,
     '',
-    `Audio Profile: ${profile.audioProfile}`,
-    `Style: ${profile.style}`,
-    `Pace: ${profile.pace}`,
-    `Temperatura: ${profile.temperature}`,
-    `Scene: ${profile.scene}`,
-    `Sample Context: ${profile.sampleContext}`,
-    `Etiqueta: ${profile.tag}`,
+    `Audio Profile: ${data.audioProfile}`,
+    `Style: ${data.style}`,
+    `Pace: ${data.pace}`,
+    `Temperatura: ${data.temperature}`,
+    `Scene: ${data.scene}`,
+    `Sample Context: ${data.sampleContext}`,
+    `Etiqueta: ${data.tag}`,
     `Voz: ${voiceName}${voiceTrait && voiceTrait !== '—' ? ` (${voiceTrait})` : ''}.`,
   ];
   return lines.join('\n');

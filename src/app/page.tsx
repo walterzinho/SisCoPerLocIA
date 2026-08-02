@@ -4,33 +4,29 @@ import { useEffect } from 'react';
 import { useAppStore } from '@/lib/store';
 import { t as getT, type Locale } from '@/lib/i18n';
 import { Header } from '@/components/header';
-import { VoiceProfileForm } from '@/components/voice-profile-form';
-import { ProfileHistory } from '@/components/profile-history';
+import { AiProfileCreator } from '@/components/ai-profile-creator';
+import { NotionProfiles } from '@/components/notion-profiles';
 import { TagGuide } from '@/components/tag-guide';
-import { TemplateSelector } from '@/components/template-selector';
 import { NotionSettings } from '@/components/notion-settings';
-import { Mic, Clock, Tags, Settings, LayoutTemplate, Radio } from 'lucide-react';
+import { Sparkles, Database, Tags, Settings, Radio } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function Home() {
   const {
     locale, setLocale,
-    loadProfiles, loadNotionConfig, loadGoogleConfig,
+    loadNotionConfig, loadGoogleConfig,
     activeTab, setActiveTab,
     toastMessage, toastType, clearToast,
   } = useAppStore();
   const tr = getT(locale);
 
-  // Load saved data on mount
   useEffect(() => {
-    const savedLocale = (typeof window !== 'undefined' ? localStorage.getItem('vps-locale') : null) as Locale | null;
-    if (savedLocale) setLocale(savedLocale);
-    loadProfiles();
+    const saved = (typeof window !== 'undefined' ? localStorage.getItem('vps-locale') : null) as Locale | null;
+    if (saved) setLocale(saved);
     loadNotionConfig();
     loadGoogleConfig();
   }, []);
 
-  // Toast sync with sonner
   useEffect(() => {
     if (toastMessage && toastType) {
       if (toastType === 'success') toast.success(toastMessage);
@@ -40,9 +36,8 @@ export default function Home() {
   }, [toastMessage, toastType]);
 
   const tabs = [
-    { id: 'create', label: tr.nav.create, icon: Mic },
-    { id: 'templates', label: tr.nav.templates, icon: LayoutTemplate },
-    { id: 'history', label: tr.nav.history, icon: Clock },
+    { id: 'create', label: tr.nav.create, icon: Sparkles },
+    { id: 'profiles', label: tr.nav.profiles, icon: Database },
     { id: 'tagGuide', label: tr.nav.tagGuide, icon: Tags },
     { id: 'settings', label: tr.nav.settings, icon: Settings },
   ];
@@ -52,7 +47,7 @@ export default function Home() {
       <Header />
 
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-6">
-        {/* Subtitle banner */}
+        {/* Banner */}
         <div className="mb-6 rounded-xl bg-gradient-to-r from-red-950/40 via-zinc-900/60 to-purple-950/30 border border-red-900/20 p-4 sm:p-5">
           <div className="flex items-center gap-3">
             <div className="hidden sm:flex h-10 w-10 rounded-lg bg-red-500/10 items-center justify-center shrink-0">
@@ -61,13 +56,13 @@ export default function Home() {
             <div>
               <p className="text-sm text-gray-300">{tr.app.description}</p>
               <p className="text-xs text-gray-500 mt-0.5">
-                Gemini 3.1 Flash TTS Preview &middot; 30 {locale === 'es' ? 'voces disponibles' : 'voices available'}
+                {locale === 'es' ? 'Genera perfiles con IA' : 'AI-powered profiles'} &middot; {locale === 'es' ? 'Guardar en Notion' : 'Save to Notion'} &middot; 30 {locale === 'es' ? 'voces Gemini TTS' : 'Gemini TTS voices'}
               </p>
             </div>
           </div>
         </div>
 
-        {/* Tab Navigation */}
+        {/* Tabs */}
         <nav className="flex gap-1 mb-6 overflow-x-auto pb-2 -mx-1 px-1">
           {tabs.map((tab) => {
             const Icon = tab.icon;
@@ -82,7 +77,7 @@ export default function Home() {
                     : 'text-gray-500 hover:text-gray-300 hover:bg-zinc-800/50 border border-transparent'
                   }`
                 }
-              >
+ >
                 <Icon className="h-4 w-4" />
                 {tab.label}
               </button>
@@ -90,10 +85,9 @@ export default function Home() {
           })}
         </nav>
 
-        {/* Tab Content */}
-        {activeTab === 'create' && <VoiceProfileForm />}
-        {activeTab === 'templates' && <TemplateSelector />}
-        {activeTab === 'history' && <ProfileHistory />}
+        {/* Content */}
+        {activeTab === 'create' && <AiProfileCreator />}
+        {activeTab === 'profiles' && <NotionProfiles />}
         {activeTab === 'tagGuide' && <TagGuide />}
         {activeTab === 'settings' && <NotionSettings />}
       </main>
