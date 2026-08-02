@@ -20,6 +20,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Notion token is required' }, { status: 400 });
     }
 
+    // Sanitize database ID: remove dashes, spaces, and trim
+    const sanitizeId = (id: string) => id.replace(/[-\s]/g, '').trim();
+    const cleanDbId = databaseId ? sanitizeId(databaseId) : '';
+
     switch (action) {
       case 'test': {
         const res = await fetch(`${NOTION_API}/users/me`, { headers: headers(token) });
@@ -32,13 +36,26 @@ export async function POST(req: NextRequest) {
       }
 
       case 'test-database': {
-        if (!databaseId) {
+        if (!cleanDbId) {
           return NextResponse.json({ error: 'Database ID is required' }, { status: 400 });
         }
-        const res = await fetch(`${NOTION_API}/databases/${databaseId}`, { headers: headers(token) });
+        if (cleanDbId.length !== 32) {
+          return NextResponse.json({
+            error: `El ID tiene ${cleanDbId.length} caracteres pero debe tener exactamente 32 (sin guiones). Verifica que estés copiando el ID de la base de datos, no de una página.`,
+            code: 'invalid_id_length',
+          }, { status: 400 });
+        }
+        const res = await fetch(`${NOTION_API}/databases/${cleanDbId}`, { headers: headers(token) });
         if (!res.ok) {
           const err = await res.json();
-          return NextResponse.json({ error: err.message || 'Database no encontrada' }, { status: res.status });
+          const code = err.code || '';
+          let msg = err.message || 'Database no encontrada';
+          if (code === 'not_found') {
+            msg = 'No se encontró una base de datos con ese ID. Asegúrate de que el ID pertenece a una BASE DE DATOS (no a una página normal). Puedes encontrarlo en: Base de datos → ⋯ (tres puntos) → Conexiones → Copiar enlace de la base de datos. El ID son los últimos 32 caracteres hexadecimales en la URL.';
+          } else if (code === 'unauthorized') {
+            msg = 'El token no tiene acceso a esta base de datos. Asegúrate de haber compartido la base de datos con tu integración de Notion (Conexiones → Añadir integraciones).';
+          }
+          return NextResponse.json({ error: msg, code }, { status: res.status });
         }
         const db = await res.json();
         const title = db.title?.[0]?.plain_text || 'Sin título';
@@ -46,7 +63,7 @@ export async function POST(req: NextRequest) {
       }
 
       case 'query-profiles': {
-        if (!databaseId) {
+        if (!cleanDbId) {
           return NextResponse.json({ error: 'Database ID is required' }, { status: 400 });
         }
         const allProfiles: Record<string, unknown>[] = [];
@@ -54,7 +71,7 @@ export async function POST(req: NextRequest) {
         let startCursor: string | undefined;
 
         while (hasMore) {
-          const url = new URL(`${NOTION_API}/databases/${databaseId}/query`);
+          const url = new URL(`${NOTION_API}/databases/${cleanDbId}/query`);
           url.searchParams.set('page_size', '100');
           if (startCursor) url.searchParams.set('start_cursor', startCursor);
           url.searchParams.set('sorts', JSON.stringify([{ timestamp: 'created_time', direction: 'descending' }]));
@@ -110,12 +127,12 @@ export async function POST(req: NextRequest) {
       }
 
       case 'export-profile': {
-        if (!databaseId) {
+        if (!cleanDbId) {
           return NextResponse.json({ error: 'Database ID is required' }, { status: 400 });
         }
 
         const pageBody: Record<string, unknown> = {
-          parent: { database_id: databaseId },
+          parent: { database_id: cleanDbId },
           properties: {
             'Nombre del Perfil': {
               title: [{ type: 'text', text: { content: profileName || profile?.profileName || 'Sin nombre' } }],

@@ -101,8 +101,29 @@ export function NotionSettings() {
           )}
           <div className="space-y-2">
             <Label className="text-gray-400 text-xs">{tr.notion.databaseId}</Label>
-            <Input value={notionDatabaseId} onChange={e => setNotionDatabaseId(e.target.value)} placeholder={tr.notion.databaseIdPlaceholder} className="bg-zinc-800/50 border-zinc-700 text-white placeholder:text-zinc-600 font-mono text-sm" />
-            <p className="text-xs text-gray-600">{tr.notion.databaseIdHelp}</p>
+            <Input
+              value={notionDatabaseId}
+              onChange={e => {
+                // Auto-sanitize: remove dashes, spaces, keep only hex chars
+                const raw = e.target.value.replace(/[-\s]/g, '').replace(/[^0-9a-fA-F]/g, '').toLowerCase();
+                setNotionDatabaseId(raw);
+              }}
+              placeholder={tr.notion.databaseIdPlaceholder}
+              className="bg-zinc-800/50 border-zinc-700 text-white placeholder:text-zinc-600 font-mono text-sm"
+              maxLength={32}
+            />
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-gray-600">{tr.notion.databaseIdHelp}</p>
+              <span className={`text-xs tabular-nums ${notionDatabaseId.length === 32 ? 'text-emerald-400' : notionDatabaseId.length > 0 ? 'text-amber-400' : 'text-zinc-600'}`}>
+                {notionDatabaseId.length}/32
+              </span>
+            </div>
+            {notionDatabaseId.length > 0 && notionDatabaseId.length < 32 && (
+              <p className="text-xs text-amber-400/80">Faltan {32 - notionDatabaseId.length} caracteres. El ID debe tener exactamente 32 caracteres hexadecimales.</p>
+            )}
+            {notionDatabaseId.length === 32 && (
+              <p className="text-xs text-emerald-400/80">ID con formato correcto. Prueba la conexión.</p>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" className="border-red-500/30 text-red-400 hover:bg-red-500/10" onClick={testDatabase} disabled={testingDb || !notionToken || !notionDatabaseId}>
