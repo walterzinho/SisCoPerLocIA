@@ -125,6 +125,9 @@ const translations = {
       googleKey: 'API Key de Google AI',
       googleKeyPlaceholder: 'AIza...',
       googleKeyHelp: 'Obtén tu API key en aistudio.google.com',
+      testGoogleKey: 'Probar API Key',
+      googleKeyValid: 'API key válida. Modelo:',
+      googleKeyFail: 'Error con la API key.',
     },
     common: {
       language: 'Idioma',
@@ -263,6 +266,9 @@ const translations = {
       googleKey: 'Google AI API Key',
       googleKeyPlaceholder: 'AIza...',
       googleKeyHelp: 'Get your API key at aistudio.google.com',
+      testGoogleKey: 'Test API Key',
+      googleKeyValid: 'API key valid. Model:',
+      googleKeyFail: 'API key test failed.',
     },
     common: {
       language: 'Language',

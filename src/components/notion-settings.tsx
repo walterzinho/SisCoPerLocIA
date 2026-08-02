@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Settings, Plug, Database, Key, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import { Settings, Plug, Database, Key, CheckCircle2, XCircle, Loader2, Sparkles } from 'lucide-react';
 import { useState } from 'react';
 
 export function NotionSettings() {
@@ -20,10 +20,14 @@ export function NotionSettings() {
     locale, showToast,
   } = useAppStore();
   const tr = getT(locale);
+
   const [testingToken, setTestingToken] = useState(false);
   const [testingDb, setTestingDb] = useState(false);
+  const [testingGoogle, setTestingGoogle] = useState(false);
   const [tokenStatus, setTokenStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [dbStatus, setDbStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [googleStatus, setGoogleStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [googleModel, setGoogleModel] = useState('');
 
   const testToken = async () => {
     if (!notionToken) return;
@@ -53,6 +57,30 @@ export function NotionSettings() {
       else { setDbStatus('error'); showToast(`${tr.notion.databaseFail} ${data.error}`, 'error'); }
     } catch { setDbStatus('error'); showToast(tr.notion.databaseFail, 'error'); }
     setTestingDb(false);
+  };
+
+  const testGoogleKey = async () => {
+    if (!googleApiKey) return;
+    setTestingGoogle(true); setGoogleStatus('idle'); setGoogleModel('');
+    try {
+      const res = await fetch('/api/test-google', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey: googleApiKey }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setGoogleStatus('success');
+        setGoogleModel(data.model);
+        showToast(`${tr.notion.googleKeyValid} ${data.model}`, 'success');
+      } else {
+        setGoogleStatus('error');
+        showToast(`${tr.notion.googleKeyFail} ${data.error}`, 'error');
+      }
+    } catch {
+      setGoogleStatus('error');
+      showToast(tr.notion.googleKeyFail, 'error');
+    }
+    setTestingGoogle(false);
   };
 
   return (
@@ -104,7 +132,6 @@ export function NotionSettings() {
             <Input
               value={notionDatabaseId}
               onChange={e => {
-                // Auto-sanitize: remove dashes, spaces, keep only hex chars
                 const raw = e.target.value.replace(/[-\s]/g, '').replace(/[^0-9a-fA-F]/g, '').toLowerCase();
                 setNotionDatabaseId(raw);
               }}
@@ -119,7 +146,7 @@ export function NotionSettings() {
               </span>
             </div>
             {notionDatabaseId.length > 0 && notionDatabaseId.length < 32 && (
-              <p className="text-xs text-amber-400/80">Faltan {32 - notionDatabaseId.length} caracteres. El ID debe tener exactamente 32 caracteres hexadecimales.</p>
+              <p className="text-xs text-amber-400/80">Faltan {32 - notionDatabaseId.length} caracteres.</p>
             )}
             {notionDatabaseId.length === 32 && (
               <p className="text-xs text-emerald-400/80">ID con formato correcto. Prueba la conexión.</p>
@@ -142,7 +169,7 @@ export function NotionSettings() {
       <Card className="bg-zinc-900/60 border-zinc-800/50">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm text-gray-300 flex items-center gap-2">
-            <Key className="h-4 w-4" />{tr.notion.googleSection}
+            <Sparkles className="h-4 w-4 text-amber-400" />{tr.notion.googleSection}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -150,6 +177,19 @@ export function NotionSettings() {
             <Label className="text-gray-400 text-xs">{tr.notion.googleKey}</Label>
             <Input type="password" value={googleApiKey} onChange={e => setGoogleApiKey(e.target.value)} placeholder={tr.notion.googleKeyPlaceholder} className="bg-zinc-800/50 border-zinc-700 text-white placeholder:text-zinc-600" />
             <p className="text-xs text-gray-600">{tr.notion.googleKeyHelp}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" className="border-amber-500/30 text-amber-400 hover:bg-amber-500/10" onClick={testGoogleKey} disabled={testingGoogle || !googleApiKey}>
+              {testingGoogle ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5 mr-1.5" />}
+              {tr.notion.testGoogleKey}
+            </Button>
+            {googleStatus === 'success' && (
+              <Badge variant="outline" className="border-emerald-500/30 text-emerald-400 text-xs">
+                <CheckCircle2 className="h-3 w-3 mr-1" />
+                {googleModel}
+              </Badge>
+            )}
+            {googleStatus === 'error' && <XCircle className="h-4 w-4 text-red-400" />}
           </div>
         </CardContent>
       </Card>
