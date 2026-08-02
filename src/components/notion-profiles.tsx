@@ -135,6 +135,7 @@ export function NotionProfiles() {
                         <div className="flex flex-wrap gap-1.5">
                           {profile.style && <Badge className="bg-zinc-800 text-gray-400 text-xs">{profile.style}</Badge>}
                           {profile.pace && <Badge className="bg-zinc-800 text-gray-400 text-xs">{profile.pace}</Badge>}
+                          {profile.language && <Badge className="bg-sky-500/15 text-sky-400 text-xs border border-sky-500/20">{profile.language}</Badge>}
                           {profile.tag && <code className="text-xs text-red-400/70">{profile.tag}</code>}
                         </div>
                         <p className="text-xs text-gray-600 mt-2">{new Date(profile.createdAt).toLocaleString(locale === 'es' ? 'es-CO' : 'en-US')}</p>

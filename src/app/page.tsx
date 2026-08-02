@@ -94,7 +94,7 @@ export default function Home() {
 
       <footer className="border-t border-zinc-800/50 mt-auto">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between text-xs text-gray-600">
-          <span>Voice Profile Studio &middot; Gemini TTS</span>
+          <span>SisCoPerLocIA &middot; Gemini TTS</span>
           <span>Voces Campesinas</span>
         </div>
       </footer>

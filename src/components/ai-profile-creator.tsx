@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useAppStore, buildProfileText } from '@/lib/store';
 import { t as getT } from '@/lib/i18n';
 import { voices, getVoiceById } from '@/lib/voices';
@@ -76,6 +77,8 @@ export function AiProfileCreator() {
     catch { showToast(tr.preview.copyFail, 'error'); }
   };
 
+  const [isTranslating, setIsTranslating] = useState(false);
+
   const handleSaveNotion = async () => {
     if (!aiGenerated || !generatedText) {
       showToast(locale === 'es' ? 'Genera un perfil primero' : 'Generate a profile first', 'error');
@@ -85,6 +88,7 @@ export function AiProfileCreator() {
       showToast(locale === 'es' ? 'Configura Notion en Configuración' : 'Configure Notion in Settings', 'error');
       return;
     }
+
     const action = editingPageId ? 'update-profile' : 'export-profile';
     const body: Record<string, unknown> = {
       action, token: notionToken, databaseId: notionDatabaseId, profileName,
@@ -108,11 +112,48 @@ export function AiProfileCreator() {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
       });
       const data = await res.json();
-      if (data.success) {
-        showToast(editingPageId ? tr.notion.updateSuccess : tr.notion.exportSuccess, 'success');
-        setEditingPageId(null);
-      } else {
+      if (!data.success) {
         showToast(data.error || tr.notion.exportFail, 'error');
+        return;
+      }
+
+      const savedPageId = editingPageId || data.pageId;
+      showToast(editingPageId ? tr.notion.updateSuccess : tr.notion.exportSuccess, 'success');
+      setEditingPageId(null);
+
+      // After saving, generate English instructions and update the same page
+      if (googleApiKey) {
+        setIsTranslating(true);
+        showToast(tr.form.translating, 'success');
+        try {
+          const enRes = await fetch('/api/generate-en', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ apiKey: googleApiKey, profile: aiGenerated, announcerName: aiInput.name }),
+          });
+          const enData = await enRes.json();
+          if (enData.success && enData.text) {
+            // Update the Notion page with English instructions
+            await fetch('/api/notion', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                action: 'update-profile',
+                token: notionToken,
+                databaseId: notionDatabaseId,
+                pageId: savedPageId,
+                profile: {
+                  language: 'Español / English',
+                  englishInstructions: enData.text,
+                },
+              }),
+            });
+            showToast(tr.form.translateDone, 'success');
+          } else {
+            showToast(tr.form.translateFail, 'error');
+          }
+        } catch {
+          showToast(tr.form.translateFail, 'error');
+        }
+        setIsTranslating(false);
       }
     } catch {
       showToast(tr.notion.exportFail, 'error');
@@ -366,13 +407,14 @@ export function AiProfileCreator() {
 
           {/* Actions */}
           <div className="flex flex-wrap gap-3">
-            <Button onClick={handleSaveNotion} className="bg-red-600 hover:bg-red-700 text-white font-medium">
-              <Upload className="h-4 w-4 mr-2" />{editingPageId ? tr.form.updateNotion : tr.form.saveNotion}
+            <Button onClick={handleSaveNotion} disabled={isTranslating} className="bg-red-600 hover:bg-red-700 text-white font-medium">
+              {isTranslating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
+              {isTranslating ? tr.form.translating : (editingPageId ? tr.form.updateNotion : tr.form.saveNotion)}
             </Button>
             <Button variant="outline" onClick={handleCopy} className="border-zinc-700 text-gray-400 hover:text-white hover:bg-zinc-800">
               <Copy className="h-4 w-4 mr-2" />{tr.form.copy}
             </Button>
-            <Button variant="outline" onClick={resetAiInput} className="border-zinc-700 text-gray-400 hover:text-white hover:bg-zinc-800">
+            <Button variant="outline" onClick={resetAiInput} className="border-zinc-700 text-gray-400 hover:text-white hover:bg-zinc-800" disabled={isTranslating}>
               {tr.form.clear}
             </Button>
           </div>

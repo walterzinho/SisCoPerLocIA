@@ -114,6 +114,8 @@ export async function POST(req: NextRequest) {
               scene: getProp('Scene'),
               sampleContext: getProp('Sample Context'),
               tag: getProp('Etiqueta') || getProp('Tag'),
+              language: getProp('Idioma') || getProp('Language'),
+              englishInstructions: getProp('Instrucciones EN') || getProp('EN Instructions'),
               fullConfig: getProp('Configuración Completa') || getProp('Full Configuration'),
               createdAt: page.created_time,
             });
@@ -151,6 +153,7 @@ export async function POST(req: NextRequest) {
         if (profile?.sampleContext) props['Sample Context'] = { rich_text: [{ type: 'text', text: { content: profile.sampleContext } }] };
         if (profile?.tag) props['Etiqueta'] = { rich_text: [{ type: 'text', text: { content: profile.tag } }] };
         if (profile?.generatedText) props['Configuración Completa'] = { rich_text: [{ type: 'text', text: { content: profile.generatedText } }] };
+        props['Idioma'] = { select: { name: 'Español' } };
 
         const res = await fetch(`${NOTION_API}/pages`, {
           method: 'POST',
@@ -184,6 +187,8 @@ export async function POST(req: NextRequest) {
         if (profile?.sampleContext) updateProps['Sample Context'] = { rich_text: [{ type: 'text', text: { content: profile.sampleContext } }] };
         if (profile?.tag) updateProps['Etiqueta'] = { rich_text: [{ type: 'text', text: { content: profile.tag } }] };
         if (profile?.generatedText) updateProps['Configuración Completa'] = { rich_text: [{ type: 'text', text: { content: profile.generatedText } }] };
+        if (profile?.language) updateProps['Idioma'] = { select: { name: profile.language } };
+        if (profile?.englishInstructions) updateProps['Instrucciones EN'] = { rich_text: [{ type: 'text', text: { content: profile.englishInstructions } }] };
 
         const res = await fetch(`${NOTION_API}/pages/${pageId}`, {
           method: 'PATCH',

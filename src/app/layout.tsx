@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Voice Profile Studio - Creador de Perfiles de Voz",
-  description: "Crea perfiles de voz para locución con IA usando Gemini TTS. Configura Audio Profile, Style, Pace, Temperature y más.",
+  title: "SisCoPerLocIA - Sistema de configuración de Perfiles para locuciones con IA",
+  description: "Generadores de Perfiles para locuciones con Inteligencia Artificial. Crea configuraciones de voz para Gemini TTS y guárdalas en Notion.",
   icons: {
     icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎙️</text></svg>",
   },

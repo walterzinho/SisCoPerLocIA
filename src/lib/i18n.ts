@@ -3,9 +3,9 @@ export type Locale = 'es' | 'en';
 const translations = {
   es: {
     app: {
-      title: 'Voice Profile Studio',
-      subtitle: 'Creador de perfiles de voz para locución con IA',
-      description: 'Genera perfiles de voz con IA para Gemini TTS y guárdalos en Notion',
+      title: 'SisCoPerLocIA',
+      subtitle: 'Sistema de configuración de Perfiles para locuciones con Inteligencia Artificial',
+      description: 'Generadores de Perfiles para locuciones con IA',
     },
     nav: {
       create: 'Crear con IA',
@@ -58,6 +58,9 @@ const translations = {
       copy: 'Copiar al Portapapeles',
       saveNotion: 'Guardar en Notion',
       updateNotion: 'Actualizar en Notion',
+      translating: 'Generando instrucciones en inglés...',
+      translateDone: 'Instrucciones en inglés agregadas',
+      translateFail: 'Error al generar versión en inglés',
       clear: 'Limpiar Todo',
       backToInput: 'Volver a Datos Iniciales',
     },
@@ -146,9 +149,9 @@ const translations = {
   },
   en: {
     app: {
-      title: 'Voice Profile Studio',
-      subtitle: 'AI Voice Profile Creator for Radio Broadcasting',
-      description: 'Generate voice profiles with AI for Gemini TTS and save them to Notion',
+      title: 'SisCoPerLocIA',
+      subtitle: 'Voice Profile Configuration System with Artificial Intelligence',
+      description: 'AI-powered Voice Profile Generators for Broadcasting',
     },
     nav: {
       create: 'Create with AI',
@@ -199,6 +202,9 @@ const translations = {
       copy: 'Copy to Clipboard',
       saveNotion: 'Save to Notion',
       updateNotion: 'Update in Notion',
+      translating: 'Generating English instructions...',
+      translateDone: 'English instructions added',
+      translateFail: 'Failed to generate English version',
       clear: 'Clear All',
       backToInput: 'Back to Initial Data',
     },
