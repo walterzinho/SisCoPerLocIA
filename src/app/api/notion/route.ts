@@ -41,25 +41,72 @@ export async function POST(req: NextRequest) {
         }
         if (cleanDbId.length !== 32) {
           return NextResponse.json({
-            error: `El ID tiene ${cleanDbId.length} caracteres pero debe tener exactamente 32 (sin guiones). Verifica que estés copiando el ID de la base de datos, no de una página.`,
+            error: `El ID tiene ${cleanDbId.length} caracteres pero debe tener exactamente 32 (sin guiones).`,
             code: 'invalid_id_length',
           }, { status: 400 });
         }
-        const res = await fetch(`${NOTION_API}/databases/${cleanDbId}`, { headers: headers(token) });
-        if (!res.ok) {
-          const err = await res.json();
-          const code = err.code || '';
-          let msg = err.message || 'Database no encontrada';
-          if (code === 'not_found') {
-            msg = 'No se encontró una base de datos con ese ID. Asegúrate de que el ID pertenece a una BASE DE DATOS (no a una página normal). Puedes encontrarlo en: Base de datos → ⋯ (tres puntos) → Conexiones → Copiar enlace de la base de datos. El ID son los últimos 32 caracteres hexadecimales en la URL.';
-          } else if (code === 'unauthorized') {
-            msg = 'El token no tiene acceso a esta base de datos. Asegúrate de haber compartido la base de datos con tu integración de Notion (Conexiones → Añadir integraciones).';
-          }
-          return NextResponse.json({ error: msg, code }, { status: res.status });
+
+        // 1) Try as database
+        let res = await fetch(`${NOTION_API}/databases/${cleanDbId}`, { headers: headers(token) });
+
+        if (res.ok) {
+          const db = await res.json();
+          const title = db.title?.[0]?.plain_text || 'Sin título';
+          return NextResponse.json({ success: true, title, url: db.url });
         }
-        const db = await res.json();
-        const title = db.title?.[0]?.plain_text || 'Sin título';
-        return NextResponse.json({ success: true, title, url: db.url });
+
+        // 2) Failed as database — try as PAGE to see if user copied a page ID instead
+        const pageRes = await fetch(`${NOTION_API}/pages/${cleanDbId}`, { headers: headers(token) });
+
+        if (pageRes.ok) {
+          const pageData = await pageRes.json();
+          const parentDb = pageData.parent?.database_id;
+          const parentPage = pageData.parent?.page_id;
+          const pageName = (pageData.properties as Record<string, Record<string, unknown>>)?.Nombre?.title
+            ?.map((t: Record<string, string>) => t.plain_text).join('')
+            || (pageData.properties as Record<string, Record<string, unknown>>)?.['Nombre del Perfil']?.title
+              ?.map((t: Record<string, string>) => t.plain_text).join('')
+            || 'esta página';
+
+          if (parentDb) {
+            return NextResponse.json({
+              error: `Ese ID es de una PÁGINA (${pageName}), no de la base de datos. El ID de tu base de datos es:
+${parentDb}
+
+Copia ese ID y pégalo en el campo de ID de Base de Datos.`,
+              code: 'page_instead_of_database',
+              correctDatabaseId: parentDb,
+            }, { status: 400 });
+          }
+
+          if (parentPage) {
+            return NextResponse.json({
+              error: `Ese ID es de una página normal (${pageName}) que no está dentro de una base de datos. Necesitas encontrar el ID de la BASE DE DATOS (vista de tabla), no de una página individual.`,
+              code: 'regular_page',
+            }, { status: 400 });
+          }
+
+          return NextResponse.json({
+            error: `Ese ID es de una página, no de una base de datos. Asegúrate de copiar el ID de la vista de tabla (base de datos), no de una página individual.`,
+            code: 'page_instead_of_database',
+          }, { status: 400 });
+        }
+
+        // 3) Not found as either database or page
+        const dbErr = await res.json().catch(() => ({}));
+        const code = dbErr.code || '';
+
+        if (code === 'unauthorized' || res.status === 401) {
+          return NextResponse.json({
+            error: 'La integración no tiene acceso a ese recurso. Ve a la base de datos en Notion → ⋯ (tres puntos) → Conexiones → Añade tu integración.',
+            code: 'unauthorized',
+          }, { status: 403 });
+        }
+
+        return NextResponse.json({
+          error: `No se encontró ninguna base de datos ni página con ese ID (${cleanDbId}). Verifica que lo hayas copiado correctamente de la URL de Notion.`,
+          code: 'not_found',
+        }, { status: 404 });
       }
 
       case 'query-profiles': {

@@ -53,8 +53,35 @@ export function NotionSettings() {
         body: JSON.stringify({ action: 'test-database', token: notionToken, databaseId: notionDatabaseId }),
       });
       const data = await res.json();
-      if (data.success) { setDbStatus('success'); setNotionDbTitle(data.title); showToast(`${tr.notion.databaseFound} ${data.title}`, 'success'); }
-      else { setDbStatus('error'); showToast(`${tr.notion.databaseFail} ${data.error}`, 'error'); }
+      if (data.success) {
+        setDbStatus('success'); setNotionDbTitle(data.title); showToast(`${tr.notion.databaseFound} ${data.title}`, 'success');
+      } else if (data.code === 'page_instead_of_database' && data.correctDatabaseId) {
+        // Auto-fix: the user pasted a page ID, we found the parent database ID
+        setNotionDatabaseId(data.correctDatabaseId);
+        setDbStatus('idle');
+        showToast('ID corregido automáticamente: era un ID de página. Probando con el ID correcto de la base de datos...', 'success');
+        // Auto-test with the correct ID after a brief pause
+        setTimeout(async () => {
+          try {
+            const retry = await fetch('/api/notion', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'test-database', token: notionToken, databaseId: data.correctDatabaseId }),
+            });
+            const retryData = await retry.json();
+            if (retryData.success) {
+              setDbStatus('success'); setNotionDbTitle(retryData.title);
+              showToast(`${tr.notion.databaseFound} ${retryData.title}`, 'success');
+            } else {
+              setDbStatus('error');
+              showToast(`${tr.notion.databaseFail} ${retryData.error}`, 'error');
+            }
+          } catch {
+            setDbStatus('error'); showToast(tr.notion.databaseFail, 'error');
+          }
+        }, 800);
+      } else {
+        setDbStatus('error'); showToast(`${tr.notion.databaseFail} ${data.error}`, 'error');
+      }
     } catch { setDbStatus('error'); showToast(tr.notion.databaseFail, 'error'); }
     setTestingDb(false);
   };
