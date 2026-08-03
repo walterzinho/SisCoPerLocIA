@@ -35,6 +35,33 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: true, name: user.name || 'Connected' });
       }
 
+      case 'list-databases': {
+        const allDbs: { id: string; title: string; url: string }[] = [];
+        let hasMore = true;
+        let startCursor: string | undefined;
+        while (hasMore) {
+          const url = new URL(`${NOTION_API}/search`);
+          url.searchParams.set('page_size', '100');
+          url.searchParams.set('filter', JSON.stringify({ value: 'database', property: 'object' }));
+          if (startCursor) url.searchParams.set('start_cursor', startCursor);
+          const res = await fetch(url.toString(), {
+            method: 'POST', headers: headers(token), body: JSON.stringify({}),
+          });
+          if (!res.ok) {
+            const err = await res.json();
+            return NextResponse.json({ error: err.message || 'Failed to search' }, { status: res.status });
+          }
+          const data = await res.json();
+          for (const db of data.results) {
+            const title = (db.title as Array<Record<string, string>>)?.map(t => t.plain_text).join('') || 'Sin título';
+            allDbs.push({ id: db.id, title, url: db.url });
+          }
+          hasMore = data.has_more;
+          startCursor = data.next_cursor;
+        }
+        return NextResponse.json({ success: true, databases: allDbs });
+      }
+
       case 'test-database': {
         if (!cleanDbId) {
           return NextResponse.json({ error: 'Database ID is required' }, { status: 400 });

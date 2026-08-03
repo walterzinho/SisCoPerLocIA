@@ -8,8 +8,14 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Settings, Plug, Database, Key, CheckCircle2, XCircle, Loader2, Sparkles } from 'lucide-react';
+import { Settings, Plug, Database, Key, CheckCircle2, XCircle, Loader2, Sparkles, Search } from 'lucide-react';
 import { useState } from 'react';
+
+interface FoundDb {
+  id: string;
+  title: string;
+  url: string;
+}
 
 export function NotionSettings() {
   const {
@@ -24,10 +30,14 @@ export function NotionSettings() {
   const [testingToken, setTestingToken] = useState(false);
   const [testingDb, setTestingDb] = useState(false);
   const [testingGoogle, setTestingGoogle] = useState(false);
+  const [findingDbs, setFindingDbs] = useState(false);
+  const [foundDbs, setFoundDbs] = useState<FoundDb[]>([]);
   const [tokenStatus, setTokenStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [dbStatus, setDbStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [googleStatus, setGoogleStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [googleModel, setGoogleModel] = useState('');
+
+  const sanitizeNotionId = (v: string) => v.replace(/[-\s]/g, '').replace(/[^0-9a-fA-F]/g, '').toLowerCase();
 
   const testToken = async () => {
     if (!notionToken) return;
@@ -44,6 +54,33 @@ export function NotionSettings() {
     setTestingToken(false);
   };
 
+  const findDatabases = async () => {
+    if (!notionToken) return;
+    setFindingDbs(true); setFoundDbs([]);
+    try {
+      const res = await fetch('/api/notion', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'list-databases', token: notionToken }),
+      });
+      const data = await res.json();
+      if (data.success && data.databases.length > 0) {
+        setFoundDbs(data.databases);
+      } else {
+        showToast(tr.notion.noDatabases, 'error');
+      }
+    } catch { showToast(tr.notion.databaseFail, 'error'); }
+    setFindingDbs(false);
+  };
+
+  const selectDatabase = (db: FoundDb) => {
+    const cleanId = db.id.replace(/[-\s]/g, '').toLowerCase();
+    setNotionDatabaseId(cleanId);
+    setNotionDbTitle(db.title);
+    setDbStatus('success');
+    setFoundDbs([]);
+    showToast(`${tr.notion.databaseFound} ${db.title}`, 'success');
+  };
+
   const testDatabase = async () => {
     if (!notionToken || !notionDatabaseId) return;
     setTestingDb(true); setDbStatus('idle');
@@ -56,11 +93,9 @@ export function NotionSettings() {
       if (data.success) {
         setDbStatus('success'); setNotionDbTitle(data.title); showToast(`${tr.notion.databaseFound} ${data.title}`, 'success');
       } else if (data.code === 'page_instead_of_database' && data.correctDatabaseId) {
-        // Auto-fix: the user pasted a page ID, we found the parent database ID
         setNotionDatabaseId(data.correctDatabaseId);
         setDbStatus('idle');
-        showToast('ID corregido automáticamente: era un ID de página. Probando con el ID correcto de la base de datos...', 'success');
-        // Auto-test with the correct ID after a brief pause
+        showToast('ID corregido automáticamente: era un ID de página. Probando con el ID correcto...', 'success');
         setTimeout(async () => {
           try {
             const retry = await fetch('/api/notion', {
@@ -72,12 +107,9 @@ export function NotionSettings() {
               setDbStatus('success'); setNotionDbTitle(retryData.title);
               showToast(`${tr.notion.databaseFound} ${retryData.title}`, 'success');
             } else {
-              setDbStatus('error');
-              showToast(`${tr.notion.databaseFail} ${retryData.error}`, 'error');
+              setDbStatus('error'); showToast(`${tr.notion.databaseFail} ${retryData.error}`, 'error');
             }
-          } catch {
-            setDbStatus('error'); showToast(tr.notion.databaseFail, 'error');
-          }
+          } catch { setDbStatus('error'); showToast(tr.notion.databaseFail, 'error'); }
         }, 800);
       } else {
         setDbStatus('error'); showToast(`${tr.notion.databaseFail} ${data.error}`, 'error');
@@ -96,17 +128,12 @@ export function NotionSettings() {
       });
       const data = await res.json();
       if (data.success) {
-        setGoogleStatus('success');
-        setGoogleModel(data.model);
+        setGoogleStatus('success'); setGoogleModel(data.model);
         showToast(`${tr.notion.googleKeyValid} ${data.model}`, 'success');
       } else {
-        setGoogleStatus('error');
-        showToast(`${tr.notion.googleKeyFail} ${data.error}`, 'error');
+        setGoogleStatus('error'); showToast(`${tr.notion.googleKeyFail} ${data.error}`, 'error');
       }
-    } catch {
-      setGoogleStatus('error');
-      showToast(tr.notion.googleKeyFail, 'error');
-    }
+    } catch { setGoogleStatus('error'); showToast(tr.notion.googleKeyFail, 'error'); }
     setTestingGoogle(false);
   };
 
@@ -154,13 +181,47 @@ export function NotionSettings() {
               <Badge variant="outline" className="border-emerald-500/30 text-emerald-400"><CheckCircle2 className="h-3 w-3 mr-1" />{notionDbTitle}</Badge>
             </div>
           )}
+
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" className="border-amber-500/30 text-amber-400 hover:bg-amber-500/10" onClick={findDatabases} disabled={findingDbs || !notionToken}>
+              {findingDbs ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Search className="h-3.5 w-3.5 mr-1.5" />}
+              {tr.notion.findDatabases}
+            </Button>
+          </div>
+
+          {foundDbs.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs text-gray-400 font-medium">{tr.notion.selectDatabase}</p>
+              <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                {foundDbs.map(db => {
+                  const cleanId = db.id.replace(/-/g, '').replace(/\s/g, '').toLowerCase();
+                  return (
+                  <button
+                    key={db.id}
+                    onClick={() => selectDatabase(db)}
+                    className={`w-full text-left p-2.5 rounded-lg border transition-colors cursor-pointer ${
+                      notionDatabaseId === cleanId
+                        ? 'border-emerald-500/40 bg-emerald-500/10'
+                        : 'border-zinc-800 hover:border-red-500/30 hover:bg-zinc-800/50'
+                    }`}
+                  >
+                    <p className="text-sm text-white font-medium truncate">{db.title}</p>
+                    <p className="text-xs text-gray-600 font-mono mt-0.5">{cleanId}</p>
+                  </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label className="text-gray-400 text-xs">{tr.notion.databaseId}</Label>
             <Input
               value={notionDatabaseId}
               onChange={e => {
-                const raw = e.target.value.replace(/[-\s]/g, '').replace(/[^0-9a-fA-F]/g, '').toLowerCase();
+                const raw = sanitizeNotionId(e.target.value);
                 setNotionDatabaseId(raw);
+                setDbStatus('idle'); setNotionDbTitle('');
               }}
               placeholder={tr.notion.databaseIdPlaceholder}
               className="bg-zinc-800/50 border-zinc-700 text-white placeholder:text-zinc-600 font-mono text-sm"
@@ -175,7 +236,7 @@ export function NotionSettings() {
             {notionDatabaseId.length > 0 && notionDatabaseId.length < 32 && (
               <p className="text-xs text-amber-400/80">Faltan {32 - notionDatabaseId.length} caracteres.</p>
             )}
-            {notionDatabaseId.length === 32 && (
+            {notionDatabaseId.length === 32 && dbStatus !== 'success' && (
               <p className="text-xs text-emerald-400/80">ID con formato correcto. Prueba la conexión.</p>
             )}
           </div>
@@ -192,7 +253,6 @@ export function NotionSettings() {
 
       <Separator className="bg-zinc-800" />
 
-      {/* Google AI */}
       <Card className="bg-zinc-900/60 border-zinc-800/50">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm text-gray-300 flex items-center gap-2">
