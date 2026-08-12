@@ -27,6 +27,9 @@ export default function Home() {
     loadGoogleConfig();
   }, []);
 
+  // Auto-test connections after server config loads
+  // (intentionally empty - values pre-load from server env via loadNotionConfig)
+
   useEffect(() => {
     if (toastMessage && toastType) {
       if (toastType === 'success') toast.success(toastMessage);

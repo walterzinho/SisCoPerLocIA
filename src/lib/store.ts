@@ -72,7 +72,7 @@ interface AppState {
   setNotionDatabaseId: (v: string) => void;
   notionDbTitle: string;
   setNotionDbTitle: (v: string) => void;
-  loadNotionConfig: () => void;
+  loadNotionConfig: () => Promise<void>;
 
   // Notion profiles
   notionProfiles: NotionProfile[];
@@ -139,12 +139,32 @@ export const useAppStore = create<AppState>((set, get) => ({
   setNotionDatabaseId: (v) => { if (typeof window !== 'undefined') localStorage.setItem('vps-notion-db-id', v); set({ notionDatabaseId: v }); },
   notionDbTitle: '',
   setNotionDbTitle: (v) => set({ notionDbTitle: v }),
-  loadNotionConfig: () => {
+  loadNotionConfig: async () => {
     if (typeof window === 'undefined') return;
-    set({
-      notionToken: localStorage.getItem('vps-notion-token') || '',
-      notionDatabaseId: localStorage.getItem('vps-notion-db-id') || '',
-    });
+    const localToken = localStorage.getItem('vps-notion-token') || '';
+    const localDbId = localStorage.getItem('vps-notion-db-id') || '';
+    // If both are already in localStorage, use them
+    if (localToken && localDbId) {
+      set({ notionToken: localToken, notionDatabaseId: localDbId });
+      return;
+    }
+    // Otherwise, try to load from server env vars
+    try {
+      const res = await fetch('/api/config');
+      const data = await res.json();
+      const token = localToken || data.notionToken || '';
+      const dbId = localDbId || data.notionDatabaseId || '';
+      if (token) localStorage.setItem('vps-notion-token', token);
+      if (dbId) localStorage.setItem('vps-notion-db-id', dbId);
+      if (data.googleApiKey) localStorage.setItem('vps-google-key', data.googleApiKey);
+      set({
+        notionToken: token,
+        notionDatabaseId: dbId,
+        googleApiKey: data.googleApiKey || get().googleApiKey || localStorage.getItem('vps-google-key') || '',
+      });
+    } catch {
+      set({ notionToken: localToken, notionDatabaseId: localDbId });
+    }
   },
 
   notionProfiles: [],
@@ -159,7 +179,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   setGoogleApiKey: (v) => { if (typeof window !== 'undefined') localStorage.setItem('vps-google-key', v); set({ googleApiKey: v }); },
   loadGoogleConfig: () => {
     if (typeof window === 'undefined') return;
-    set({ googleApiKey: localStorage.getItem('vps-google-key') || '' });
+    const local = localStorage.getItem('vps-google-key') || '';
+    if (local) set({ googleApiKey: local });
   },
 
   activeTab: 'create',
