@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useAppStore } from '@/lib/store';
 import { t as getT, type Locale } from '@/lib/i18n';
+import { ErrorBoundary } from '@/components/error-boundary';
 import { Header } from '@/components/header';
 import { AiProfileCreator } from '@/components/ai-profile-creator';
 import { NotionProfiles } from '@/components/notion-profiles';
@@ -89,10 +90,10 @@ export default function Home() {
         </nav>
 
         {/* Content */}
-        {activeTab === 'create' && <AiProfileCreator />}
-        {activeTab === 'profiles' && <NotionProfiles />}
-        {activeTab === 'tagGuide' && <TagGuide />}
-        {activeTab === 'settings' && <NotionSettings />}
+        {activeTab === 'create' && <ErrorBoundary><AiProfileCreator /></ErrorBoundary>}
+        {activeTab === 'profiles' && <ErrorBoundary><NotionProfiles /></ErrorBoundary>}
+        {activeTab === 'tagGuide' && <ErrorBoundary><TagGuide /></ErrorBoundary>}
+        {activeTab === 'settings' && <ErrorBoundary><NotionSettings /></ErrorBoundary>}
       </main>
 
       <footer className="border-t border-zinc-800/50 mt-auto">

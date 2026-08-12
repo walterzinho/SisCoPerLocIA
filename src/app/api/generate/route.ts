@@ -76,7 +76,6 @@ export async function POST(req: NextRequest) {
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
             temperature: 0.7,
-            responseMimeType: 'application/json',
           },
         }),
       }
@@ -88,18 +87,35 @@ export async function POST(req: NextRequest) {
     }
 
     const result = await res.json();
-    const text = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+    let text = result?.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (!text) {
-      return NextResponse.json({ error: 'No response from Gemini' }, { status: 500 });
+      // Try to extract from model response in different formats
+      const modelStr = JSON.stringify(result);
+      console.error('Gemini response:', modelStr.substring(0, 500));
+      return NextResponse.json({ error: 'No response from Gemini', debug: modelStr.substring(0, 300) }, { status: 500 });
     }
 
     let profile;
     try {
-      const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-      profile = JSON.parse(cleaned);
+      // Try direct parse first
+      profile = JSON.parse(text);
     } catch {
-      return NextResponse.json({ error: 'Failed to parse AI response as JSON', raw: text }, { status: 500 });
+      // Try extracting JSON from markdown code blocks
+      const jsonMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
+      if (jsonMatch) {
+        try { profile = JSON.parse(jsonMatch[1]); } catch { /* fall through */ }
+      }
+      // Try finding JSON object in text
+      if (!profile) {
+        const objMatch = text.match(/\{[\s\S]*\}/);
+        if (objMatch) {
+          try { profile = JSON.parse(objMatch[0]); } catch { /* fall through */ }
+        }
+      }
+      if (!profile) {
+        return NextResponse.json({ error: 'Failed to parse AI response as JSON', raw: text.substring(0, 500) }, { status: 500 });
+      }
     }
 
     return NextResponse.json({ success: true, profile });

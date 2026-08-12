@@ -51,7 +51,6 @@ Respond with the COMPLETE translated profile in this exact JSON format:
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
             temperature: 0.5,
-            responseMimeType: 'application/json',
           },
         }),
       }
@@ -71,10 +70,17 @@ Respond with the COMPLETE translated profile in this exact JSON format:
 
     let translated;
     try {
-      const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-      translated = JSON.parse(cleaned);
+      translated = JSON.parse(text);
     } catch {
-      return NextResponse.json({ error: 'Failed to parse AI response as JSON', raw: text }, { status: 500 });
+      const jsonMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
+      if (jsonMatch) { try { translated = JSON.parse(jsonMatch[1]); } catch { /* */ } }
+      if (!translated) {
+        const objMatch = text.match(/\{[\s\S]*\}/);
+        if (objMatch) { try { translated = JSON.parse(objMatch[0]); } catch { /* */ } }
+      }
+      if (!translated) {
+        return NextResponse.json({ error: 'Failed to parse AI response as JSON', raw: text.substring(0, 500) }, { status: 500 });
+      }
     }
 
     // Build the English instructions text
