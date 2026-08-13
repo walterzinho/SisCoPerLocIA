@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Test with a minimal Gemini API call
-    const url = `https://generativelanguage.googleapis.com/v1/models/gemini-3.6-flash:generateContent?key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
     const res = await fetch(url, {
       method: 'POST',
@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
     }
 
     const data = await res.json();
-    const modelName = data.modelVersion || 'gemini-3.6-flash';
+    const modelName = data.modelVersion || 'gemini-2.0-flash';
 
     return NextResponse.json({ success: true, model: modelName });
   } catch (error) {

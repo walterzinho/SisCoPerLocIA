@@ -168,7 +168,8 @@ export function AiProfileCreator() {
     setGeneratedText(text);
   };
 
-  const paces = ['very-slow', 'slow', 'moderate', 'fast', 'very-fast', 'rapid-fire'] as const;
+  const paces = ['natural', 'rapid-fire', 'the-drift', 'staccato'] as const;
+  const styles = ['vocal-smile', 'newscaster', 'whisper', 'empathetic', 'promo-hype', 'deadpan'] as const;
 
   // AI Input Form
   if (!showEditor) {
@@ -320,7 +321,21 @@ export function AiProfileCreator() {
                 <Label className="text-gray-300 text-sm flex items-center gap-2">
                   <Palette className="h-3.5 w-3.5 text-red-400" />{tr.form.style}
                 </Label>
-                <Input value={aiGenerated?.style || ''} onChange={e => { editField('style', e.target.value); handleRegenerateText(); }} placeholder={tr.form.stylePlaceholder} className="bg-zinc-800/50 border-zinc-700 text-white placeholder:text-zinc-600" />
+                <Select value={aiGenerated?.style || ''} onValueChange={v => { editField('style', v); handleRegenerateText(); }}>
+                  <SelectTrigger className="bg-zinc-800/50 border-zinc-700 text-white">
+                    <SelectValue placeholder={tr.form.stylePlaceholder} />
+                  </SelectTrigger>
+                  <SelectContent className="bg-zinc-900 border-zinc-700">
+                    {styles.map(s => (
+                      <SelectItem key={s} value={s} className="text-gray-200 focus:bg-red-500/10 focus:text-red-300">
+                        <div className="flex flex-col">
+                          <span>{tr.form.styles[s]} ({s})</span>
+                          <span className="text-xs text-gray-500">{tr.form.styleDescriptions[s]}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </CardContent>
             </Card>
             <Card className="bg-zinc-900/60 border-zinc-800/50">
@@ -335,7 +350,10 @@ export function AiProfileCreator() {
                   <SelectContent className="bg-zinc-900 border-zinc-700">
                     {paces.map(p => (
                       <SelectItem key={p} value={p} className="text-gray-200 focus:bg-red-500/10 focus:text-red-300">
-                        {tr.form.paces[p]} ({p})
+                        <div className="flex flex-col">
+                          <span>{tr.form.paces[p]} ({p})</span>
+                          <span className="text-xs text-gray-500">{tr.form.paceDescriptions[p]}</span>
+                        </div>
                       </SelectItem>
                     ))}
                   </SelectContent>

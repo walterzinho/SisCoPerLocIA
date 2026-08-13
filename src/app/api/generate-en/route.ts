@@ -7,7 +7,7 @@ RULES:
 2. Keep the same JSON structure.
 3. Adapt cultural references and regional descriptions so they make sense in English while preserving the original intent.
 4. Audio tags must remain in English (they already are).
-5. Pace values must remain as-is (very-slow, slow, moderate, fast, very-fast, rapid-fire).
+5. Pace values must remain as-is (natural, rapid-fire, the-drift, staccato).
 6. Temperature value must remain as a number between 0.0 and 1.0.
 7. The voice ID must remain unchanged.
 8. Respond ONLY with valid JSON, no markdown, no backticks.`;
@@ -42,7 +42,7 @@ Respond with the COMPLETE translated profile in this exact JSON format:
 }`;
 
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1/models/gemini-3.6-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -68,18 +68,23 @@ Respond with the COMPLETE translated profile in this exact JSON format:
       return NextResponse.json({ error: 'No response from Gemini' }, { status: 500 });
     }
 
+    // Robust JSON parsing
     let translated;
     try {
-      translated = JSON.parse(text);
+      translated = JSON.parse(text.trim());
     } catch {
-      const jsonMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
-      if (jsonMatch) { try { translated = JSON.parse(jsonMatch[1]); } catch { /* */ } }
-      if (!translated) {
-        const objMatch = text.match(/\{[\s\S]*\}/);
-        if (objMatch) { try { translated = JSON.parse(objMatch[0]); } catch { /* */ } }
+      const codeBlockMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
+      if (codeBlockMatch) {
+        try { translated = JSON.parse(codeBlockMatch[1].trim()); } catch { /* continue */ }
       }
       if (!translated) {
-        return NextResponse.json({ error: 'Failed to parse AI response as JSON', raw: text.substring(0, 500) }, { status: 500 });
+        const objMatch = text.match(/\{[\s\S]*\}/);
+        if (objMatch) {
+          try { translated = JSON.parse(objMatch[0]); } catch { /* continue */ }
+        }
+      }
+      if (!translated) {
+        return NextResponse.json({ error: 'Failed to parse AI response as JSON', raw: text }, { status: 500 });
       }
     }
 

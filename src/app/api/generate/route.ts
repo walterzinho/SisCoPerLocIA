@@ -15,19 +15,32 @@ Efecto Vocal: [whispers], [shouting], [low-voiced], [trembling], [nasal]
 Creativo: [like a cartoon dog], [like dracula], [mischievously], [like a news anchor], [like a storyteller]
 No Verbal: [sighs], [gasp], [giggles], [laughs], [cough]
 
-OPCIONES DE PACE: very-slow, slow, moderate, fast, very-fast, rapid-fire
+OPCIONES DE PACE (debes elegir SOLO una de esta lista exacta):
+- natural: Natural conversational pace.
+- rapid-fire: Fast, energetic, no dead air. Sentences overlap slightly.
+- the-drift: Slow, liquid, zero urgency. Long pauses for breath.
+- staccato: Short, clipped sentences with distinct pauses between words.
+
+OPCIONES DE STYLE (debes elegir SOLO una de esta lista exacta):
+- vocal-smile: The soft palate is raised to keep the tone bright, sunny, and explicitly inviting.
+- newscaster: Professional, authoritative, clear articulation with standard broadcast cadence.
+- whisper: Intimate, breathy, close-to-mic proximity effect.
+- empathetic: Warm, understanding, soft tone with gentle inflections.
+- promo-hype: High energy, punchy consonants, elongated vowels on excitement words.
+- deadpan: Flat affect, minimal pitch variation, dry delivery.
 
 REGLAS IMPORTANTES:
 1. El Audio Profile debe ser una descripción detallada de al menos 3-4 oraciones describiendo las características de la voz, edad, acento, cualidades.
-2. El Style debe ser una sola palabra o frase corta (Ej: Empathetic, Professional, Enthusiastic, Calm, Serious, Cheerful)
-3. La Temperature debe ser un número entre 0.0 y 1.0. Valores bajos = más preciso/consistente, valores altos = más creativo/variable.
-4. Scene debe describir el entorno físico o atmosférico de la grabación (2-3 oraciones).
-5. Sample Context debe describir el contexto del locutor: qué segmento conduce, a qué audiencia habla, qué tono debe tener (3-4 oraciones).
-6. El tag debe ser la etiqueta principal recomendada para el texto a locutar.
-7. suggestedTags es un array de 3-5 etiquetas adicionales que podrían ser útiles.
-8. voiceRationale explica brevemente por qué se eligió esa voz.
-9. La voz DEBE estar en la lista de voces disponibles. Usa el ID exacto (en minúsculas).
-10. Responde SIEMPRE en español.`;
+2. El Style DEBE ser exactamente uno de: vocal-smile, newscaster, whisper, empathetic, promo-hype, deadpan
+3. El pace DEBE ser exactamente uno de: natural, rapid-fire, the-drift, staccato.
+4. La Temperature debe ser un número entre 0.0 y 1.0. Valores bajos = más preciso/consistente, valores altos = más creativo/variable.
+5. Scene debe describir el entorno físico o atmosférico de la grabación (2-3 oraciones).
+6. Sample Context debe describir el contexto del locutor: qué segmento conduce, a qué audiencia habla, qué tono debe tener (3-4 oraciones).
+7. El tag debe ser la etiqueta principal recomendada para el texto a locutar.
+8. suggestedTags es un array de 3-5 etiquetas adicionales que podrían ser útiles.
+9. voiceRationale explica brevemente por qué se eligió esa voz.
+10. La voz DEBE estar en la lista de voces disponibles. Usa el ID exacto (en minúsculas).
+11. Responde SIEMPRE en español.`;
 
 function buildPrompt(data: Record<string, string>) {
   return `Genera una configuración completa de perfil de voz con estos datos del locutor/a:
@@ -67,7 +80,7 @@ export async function POST(req: NextRequest) {
     const prompt = buildPrompt(data);
 
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1/models/gemini-3.6-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -87,34 +100,32 @@ export async function POST(req: NextRequest) {
     }
 
     const result = await res.json();
-    let text = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+    const text = result?.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (!text) {
-      // Try to extract from model response in different formats
-      const modelStr = JSON.stringify(result);
-      console.error('Gemini response:', modelStr.substring(0, 500));
-      return NextResponse.json({ error: 'No response from Gemini', debug: modelStr.substring(0, 300) }, { status: 500 });
+      return NextResponse.json({ error: 'No response from Gemini' }, { status: 500 });
     }
 
+    // Robust JSON parsing
     let profile;
+    // 1. Try direct parse
     try {
-      // Try direct parse first
-      profile = JSON.parse(text);
+      profile = JSON.parse(text.trim());
     } catch {
-      // Try extracting JSON from markdown code blocks
-      const jsonMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
-      if (jsonMatch) {
-        try { profile = JSON.parse(jsonMatch[1]); } catch { /* fall through */ }
+      // 2. Try extracting from markdown code blocks
+      const codeBlockMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
+      if (codeBlockMatch) {
+        try { profile = JSON.parse(codeBlockMatch[1].trim()); } catch { /* continue to next method */ }
       }
-      // Try finding JSON object in text
+      // 3. Try extracting JSON object from text
       if (!profile) {
         const objMatch = text.match(/\{[\s\S]*\}/);
         if (objMatch) {
-          try { profile = JSON.parse(objMatch[0]); } catch { /* fall through */ }
+          try { profile = JSON.parse(objMatch[0]); } catch { /* continue */ }
         }
       }
       if (!profile) {
-        return NextResponse.json({ error: 'Failed to parse AI response as JSON', raw: text.substring(0, 500) }, { status: 500 });
+        return NextResponse.json({ error: 'Failed to parse AI response as JSON', raw: text }, { status: 500 });
       }
     }
 

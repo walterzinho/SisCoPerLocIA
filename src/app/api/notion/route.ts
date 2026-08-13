@@ -178,19 +178,19 @@ Copia ese ID y pégalo en el campo de ID de Base de Datos.`,
             allProfiles.push({
               pageId: page.id,
               url: page.url,
-              profileName: getProp('Nombre del Perfil') || getProp('Name') || getProp('Nombre'),
-              announcerName: getProp('Locutor/a') || getProp('Announcer') || getProp('Locutor'),
+              profileName: getProp('Nombre') || getProp('Nombre del Perfil') || getProp('Name'),
+              announcerName: getProp('Genero') || getProp('Locutor/a') || getProp('Announcer'),
               voice: getProp('Voz') || getProp('Voice'),
-              audioProfile: getProp('Audio Profile'),
-              style: getProp('Style'),
-              pace: getProp('Pace'),
-              temperature: getProp('Temperatura') || getProp('Temperature'),
-              scene: getProp('Scene'),
-              sampleContext: getProp('Sample Context'),
-              tag: getProp('Etiqueta') || getProp('Tag'),
+              audioProfile: getProp('Instrucciones') || getProp('Audio Profile'),
+              style: getProp('Tono') || getProp('Style'),
+              pace: getProp('Ritmo') || getProp('Pace'),
+              temperature: '',
+              scene: getProp('Escenario') || getProp('Scene'),
+              sampleContext: getProp('Instrucciones') || getProp('Sample Context'),
+              tag: getProp('Tags') || getProp('Etiqueta') || getProp('Tag'),
               language: getProp('Idioma') || getProp('Language'),
               englishInstructions: getProp('Instrucciones EN') || getProp('EN Instructions'),
-              fullConfig: getProp('Configuración Completa') || getProp('Full Configuration'),
+              fullConfig: getProp('Instrucciones') || getProp('Configuración Completa') || getProp('Full Configuration'),
               createdAt: page.created_time,
             });
           }
@@ -210,23 +210,26 @@ Copia ese ID y pégalo en el campo de ID de Base de Datos.`,
         const pageBody: Record<string, unknown> = {
           parent: { database_id: cleanDbId },
           properties: {
-            'Nombre del Perfil': {
+            'Nombre': {
               title: [{ type: 'text', text: { content: profileName || profile?.profileName || 'Sin nombre' } }],
             },
           },
         };
 
         const props = pageBody.properties as Record<string, unknown>;
-        if (profile?.announcerName) props['Locutor/a'] = { rich_text: [{ type: 'text', text: { content: profile.announcerName } }] };
+        if (profile?.announcerName) props['Genero'] = { select: { name: profile.announcerName } };
         if (profile?.voice) props['Voz'] = { select: { name: profile.voice } };
-        if (profile?.audioProfile) props['Audio Profile'] = { rich_text: [{ type: 'text', text: { content: profile.audioProfile } }] };
-        if (profile?.style) props['Style'] = { select: { name: profile.style } };
-        if (profile?.pace) props['Pace'] = { select: { name: profile.pace } };
-        if (profile?.temperature != null) props['Temperatura'] = { number: Number(profile.temperature) };
-        if (profile?.scene) props['Scene'] = { rich_text: [{ type: 'text', text: { content: profile.scene } }] };
-        if (profile?.sampleContext) props['Sample Context'] = { rich_text: [{ type: 'text', text: { content: profile.sampleContext } }] };
-        if (profile?.tag) props['Etiqueta'] = { rich_text: [{ type: 'text', text: { content: profile.tag } }] };
-        if (profile?.generatedText) props['Configuración Completa'] = { rich_text: [{ type: 'text', text: { content: profile.generatedText } }] };
+        if (profile?.style) props['Tono'] = { select: { name: profile.style } };
+        if (profile?.pace) props['Ritmo'] = { select: { name: profile.pace } };
+        if (profile?.scene) props['Escenario'] = { rich_text: [{ type: 'text', text: { content: profile.scene } }] };
+        if (profile?.sampleContext || profile?.audioProfile) {
+          const instrParts: string[] = [];
+          if (profile.audioProfile) instrParts.push(profile.audioProfile);
+          if (profile.sampleContext) instrParts.push(profile.sampleContext);
+          props['Instrucciones'] = { rich_text: [{ type: 'text', text: { content: instrParts.join('\n---\n') } }] };
+        }
+        if (profile?.tag) props['Tags'] = { multi_select: [{ name: profile.tag }] };
+        if (profile?.generatedText) props['Instrucciones'] = { rich_text: [{ type: 'text', text: { content: profile.generatedText } }] };
         props['Idioma'] = { select: { name: 'Español' } };
 
         const res = await fetch(`${NOTION_API}/pages`, {
@@ -250,17 +253,14 @@ Copia ese ID y pégalo en el campo de ID de Base de Datos.`,
         }
 
         const updateProps: Record<string, unknown> = {};
-        if (profile?.profileName) updateProps['Nombre del Perfil'] = { title: [{ type: 'text', text: { content: profile.profileName } }] };
-        if (profile?.announcerName) updateProps['Locutor/a'] = { rich_text: [{ type: 'text', text: { content: profile.announcerName } }] };
+        if (profile?.profileName) updateProps['Nombre'] = { title: [{ type: 'text', text: { content: profile.profileName } }] };
+        if (profile?.announcerName) updateProps['Genero'] = { select: { name: profile.announcerName } };
         if (profile?.voice) updateProps['Voz'] = { select: { name: profile.voice } };
-        if (profile?.audioProfile) updateProps['Audio Profile'] = { rich_text: [{ type: 'text', text: { content: profile.audioProfile } }] };
-        if (profile?.style) updateProps['Style'] = { select: { name: profile.style } };
-        if (profile?.pace) updateProps['Pace'] = { select: { name: profile.pace } };
-        if (profile?.temperature != null) updateProps['Temperatura'] = { number: Number(profile.temperature) };
-        if (profile?.scene) updateProps['Scene'] = { rich_text: [{ type: 'text', text: { content: profile.scene } }] };
-        if (profile?.sampleContext) updateProps['Sample Context'] = { rich_text: [{ type: 'text', text: { content: profile.sampleContext } }] };
-        if (profile?.tag) updateProps['Etiqueta'] = { rich_text: [{ type: 'text', text: { content: profile.tag } }] };
-        if (profile?.generatedText) updateProps['Configuración Completa'] = { rich_text: [{ type: 'text', text: { content: profile.generatedText } }] };
+        if (profile?.style) updateProps['Tono'] = { select: { name: profile.style } };
+        if (profile?.pace) updateProps['Ritmo'] = { select: { name: profile.pace } };
+        if (profile?.scene) updateProps['Escenario'] = { rich_text: [{ type: 'text', text: { content: profile.scene } }] };
+        if (profile?.tag) updateProps['Tags'] = { multi_select: [{ name: profile.tag }] };
+        if (profile?.generatedText) updateProps['Instrucciones'] = { rich_text: [{ type: 'text', text: { content: profile.generatedText } }] };
         if (profile?.language) updateProps['Idioma'] = { select: { name: profile.language } };
         if (profile?.englishInstructions) updateProps['Instrucciones EN'] = { rich_text: [{ type: 'text', text: { content: profile.englishInstructions } }] };
 
