@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { voices } from '@/lib/voices';
 
 const SYSTEM_PROMPT = `You are an expert in text-to-speech (TTS) voice configuration for Google Gemini 3.1 Flash TTS Preview. Your job is to translate and adapt voice profile instructions from Spanish to English, optimized for the AI to understand and produce the best possible voice output.
 
@@ -90,11 +91,22 @@ Respond with the COMPLETE translated profile in this exact JSON format:
 
     // Build the English instructions text
     const { buildProfileText } = await import('@/lib/store');
+    const safeProfile = {
+      voice: translated.voice || profile.voice || '',
+      audioProfile: translated.audioProfile || '',
+      style: translated.style || profile.style || '',
+      pace: translated.pace || profile.pace || '',
+      temperature: typeof translated.temperature === 'number' ? translated.temperature : (typeof profile.temperature === 'number' ? profile.temperature : 0.5),
+      scene: translated.scene || '',
+      sampleContext: translated.sampleContext || '',
+      tag: translated.tag || profile.tag || '',
+    };
+    const voiceName = translated.voice ? (voices.find((v: { id: string }) => v.id === translated.voice)?.name || translated.voice) : '';
     const enText = buildProfileText(
       'EN - ' + (announcerName || 'Profile'),
       announcerName || '',
-      translated,
-      translated.voice || '',
+      safeProfile,
+      voiceName,
       '',
     );
 

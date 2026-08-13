@@ -65,19 +65,22 @@ export function AiProfileCreator() {
         const text = buildProfileText(pName, aiInput.name, data.profile, voice?.name || '', trait);
         setGeneratedText(text);
         setGeneratedTextEn('');
-        // Auto-translate to English for preview
-        try {
-          setIsTranslatingPreview(true);
-          const enRes = await fetch('/api/generate-en', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ apiKey: googleApiKey, profile: data.profile, announcerName: aiInput.name }),
-          });
-          const enData = await enRes.json();
-          if (enData.success && enData.text) {
-            setGeneratedTextEn(enData.text);
-          }
-        } catch { /* silent — user can still see Spanish */ }
-        setIsTranslatingPreview(false);
+        // Auto-translate to English for preview (don't block the UI)
+        setIsTranslatingPreview(true);
+        fetch('/api/generate-en', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ apiKey: googleApiKey, profile: data.profile, announcerName: aiInput.name }),
+        })
+          .then(r => r.json())
+          .then(enData => {
+            if (enData.success && enData.text) {
+              setGeneratedTextEn(enData.text);
+            } else {
+              console.warn('EN translation failed:', enData.error);
+            }
+          })
+          .catch(err => console.warn('EN translation error:', err))
+          .finally(() => setIsTranslatingPreview(false));
       } else {
         showToast(data.error || 'Error', 'error');
       }
