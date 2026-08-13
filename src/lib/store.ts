@@ -64,6 +64,8 @@ interface AppState {
   // Generated text for preview
   generatedText: string;
   setGeneratedText: (text: string) => void;
+  generatedTextEn: string;
+  setGeneratedTextEn: (text: string) => void;
 
   // Notion
   notionToken: string;
@@ -115,7 +117,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   aiInput: { ...emptyAiInput },
   setAiInput: (field, value) => set((s) => ({ aiInput: { ...s.aiInput, [field]: value } })),
-  resetAiInput: () => set({ aiInput: { ...emptyAiInput }, aiGenerated: null, generatedText: '', profileName: '', showEditor: false, editingPageId: null }),
+  resetAiInput: () => set({ aiInput: { ...emptyAiInput }, aiGenerated: null, generatedText: '', generatedTextEn: '', profileName: '', showEditor: false, editingPageId: null }),
 
   isGenerating: false,
   setIsGenerating: (v) => set({ isGenerating: v }),
@@ -132,6 +134,8 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   generatedText: '',
   setGeneratedText: (text) => set({ generatedText: text }),
+  generatedTextEn: '',
+  setGeneratedTextEn: (text) => set({ generatedTextEn: text }),
 
   notionToken: '',
   setNotionToken: (v) => { if (typeof window !== 'undefined') localStorage.setItem('vps-notion-token', v); set({ notionToken: v }); },

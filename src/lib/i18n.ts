@@ -97,6 +97,10 @@ const translations = {
       noProfile: 'Completa los datos y genera un perfil con IA',
       copied: '¡Copiado al portapapeles!',
       copyFail: 'Error al copiar',
+      tabEs: 'Español',
+      tabEn: 'English',
+      translatingEn: 'Traduciendo al inglés...',
+      recommendedForTTS: 'Recomendado para Google TTS',
     },
     profiles: {
       title: 'Perfiles en Notion',
@@ -264,6 +268,10 @@ const translations = {
       noProfile: 'Fill in the data and generate a profile with AI',
       copied: 'Copied to clipboard!',
       copyFail: 'Failed to copy',
+      tabEs: 'Español',
+      tabEn: 'English',
+      translatingEn: 'Translating to English...',
+      recommendedForTTS: 'Recommended for Google TTS',
     },
     profiles: {
       title: 'Notion Profiles',

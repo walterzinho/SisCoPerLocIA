@@ -26,9 +26,12 @@ export function AiProfileCreator() {
     isGenerating, setIsGenerating, aiGenerated, setAiGenerated,
     profileName, setProfileName, editField,
     generatedText, setGeneratedText,
+    generatedTextEn, setGeneratedTextEn,
     locale, showToast, showEditor, setShowEditor,
     googleApiKey, notionToken, notionDatabaseId, editingPageId, setEditingPageId,
   } = useAppStore();
+  const [previewTab, setPreviewTab] = useState<'es' | 'en'>('es');
+  const [isTranslatingPreview, setIsTranslatingPreview] = useState(false);
   const tr = getT(locale);
 
   const selectedVoice = aiGenerated ? getVoiceById(aiGenerated.voice) : null;
@@ -54,14 +57,27 @@ export function AiProfileCreator() {
       const data = await res.json();
       if (data.success) {
         setAiGenerated(data.profile);
-        setProfileName(aiInput.profileType ? `${locale === 'es' ? 'Voz' : 'Voice'} ${aiInput.profileType} - ${aiInput.name}` : aiInput.name);
+        setPreviewTab('es');
+        const pName = aiInput.profileType ? `${locale === 'es' ? 'Voz' : 'Voice'} ${aiInput.profileType} - ${aiInput.name}` : aiInput.name;
+        setProfileName(pName);
         const voice = getVoiceById(data.profile.voice);
         const trait = voice ? (locale === 'es' ? voice.trait : voice.traitEn) : '';
-        const text = buildProfileText(
-          aiInput.profileType ? `${locale === 'es' ? 'Voz' : 'Voice'} ${aiInput.profileType} - ${aiInput.name}` : aiInput.name,
-          aiInput.name, data.profile, voice?.name || '', trait,
-        );
+        const text = buildProfileText(pName, aiInput.name, data.profile, voice?.name || '', trait);
         setGeneratedText(text);
+        setGeneratedTextEn('');
+        // Auto-translate to English for preview
+        try {
+          setIsTranslatingPreview(true);
+          const enRes = await fetch('/api/generate-en', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ apiKey: googleApiKey, profile: data.profile, announcerName: aiInput.name }),
+          });
+          const enData = await enRes.json();
+          if (enData.success && enData.text) {
+            setGeneratedTextEn(enData.text);
+          }
+        } catch { /* silent — user can still see Spanish */ }
+        setIsTranslatingPreview(false);
       } else {
         showToast(data.error || 'Error', 'error');
       }
@@ -72,8 +88,9 @@ export function AiProfileCreator() {
   };
 
   const handleCopy = async () => {
-    if (!generatedText) return;
-    try { await navigator.clipboard.writeText(generatedText); showToast(tr.preview.copied, 'success'); }
+    const textToCopy = previewTab === 'en' && generatedTextEn ? generatedTextEn : generatedText;
+    if (!textToCopy) return;
+    try { await navigator.clipboard.writeText(textToCopy); showToast(tr.preview.copied, 'success'); }
     catch { showToast(tr.preview.copyFail, 'error'); }
   };
 
@@ -447,7 +464,54 @@ export function AiProfileCreator() {
                 <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">{tr.preview.title}</h2>
               </div>
               {generatedText ? (
-                <pre className="bg-black/40 border border-zinc-800 rounded-lg p-4 text-sm text-gray-200 whitespace-pre-wrap font-mono leading-relaxed overflow-x-auto">{generatedText}</pre>
+                <>
+                  {/* Tabs */}
+                  <div className="flex gap-1 bg-black/30 rounded-lg p-1">
+                    <button
+                      onClick={() => setPreviewTab('es')}
+                      className={`flex-1 text-xs font-medium py-2 px-3 rounded-md transition-all ${
+                        previewTab === 'es'
+                          ? 'bg-red-600 text-white shadow-sm'
+                          : 'text-gray-400 hover:text-gray-200 hover:bg-zinc-800/50'
+                      }`}
+                    >
+                      {tr.preview.tabEs}
+                    </button>
+                    <button
+                      onClick={() => setPreviewTab('en')}
+                      className={`flex-1 text-xs font-medium py-2 px-3 rounded-md transition-all ${
+                        previewTab === 'en'
+                          ? 'bg-red-600 text-white shadow-sm'
+                          : 'text-gray-400 hover:text-gray-200 hover:bg-zinc-800/50'
+                      }`}
+                    >
+                      {tr.preview.tabEn}
+                      {previewTab === 'en' && generatedTextEn && (
+                        <span className="ml-1.5 inline-flex items-center gap-0.5 text-[10px] text-green-400 font-normal">
+                          <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                          {tr.preview.recommendedForTTS}
+                        </span>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Tab content */}
+                  {previewTab === 'es' ? (
+                    <pre className="bg-black/40 border border-zinc-800 rounded-lg p-4 text-sm text-gray-200 whitespace-pre-wrap font-mono leading-relaxed overflow-x-auto">{generatedText}</pre>
+                  ) : isTranslatingPreview ? (
+                    <div className="flex items-center justify-center py-8 text-gray-500">
+                      <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                      <span className="text-sm">{tr.preview.translatingEn}</span>
+                    </div>
+                  ) : generatedTextEn ? (
+                    <pre className="bg-black/40 border border-green-900/30 rounded-lg p-4 text-sm text-gray-200 whitespace-pre-wrap font-mono leading-relaxed overflow-x-auto">{generatedTextEn}</pre>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-8 text-gray-600">
+                      <AudioLines className="h-8 w-8 mb-2 text-zinc-700" />
+                      <p className="text-xs text-center">{tr.preview.translatingEn}</p>
+                    </div>
+                  )}
+                </>
               ) : (
                 <div className="flex flex-col items-center justify-center py-12 text-gray-600">
                   <AudioLines className="h-10 w-10 mb-3 text-zinc-700" />
