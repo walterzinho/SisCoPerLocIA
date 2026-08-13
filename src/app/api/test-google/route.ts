@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Test with a minimal Gemini API call
-    const url = `https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1/models/gemini-3.6-flash:generateContent?key=${apiKey}`;
 
     const res = await fetch(url, {
       method: 'POST',
