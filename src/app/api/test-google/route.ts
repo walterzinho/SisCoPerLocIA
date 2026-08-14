@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
     }
 
     const data = await res.json();
-    const modelName = data.modelVersion || 'gemini-2.0-flash';
+    const modelName = data.modelVersion || 'gemini-3.6-flash';
 
     return NextResponse.json({ success: true, model: modelName });
   } catch (error) {

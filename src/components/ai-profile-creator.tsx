@@ -17,7 +17,7 @@ import {
 import {
   User, Calendar, AudioLines, Palette, Gauge, Thermometer, Theater,
   FileText, Tag, Sparkles, Loader2, Copy, Upload, ArrowLeft, Lightbulb,
-  MapPin, Radio, MessageSquare, Pencil,
+  MapPin, Radio, MessageSquare, Pencil, Globe,
 } from 'lucide-react';
 
 export function AiProfileCreator() {
@@ -30,12 +30,13 @@ export function AiProfileCreator() {
     locale, showToast, showEditor, setShowEditor,
     googleApiKey, notionToken, notionDatabaseId, editingPageId, setEditingPageId,
   } = useAppStore();
-  const [previewTab, setPreviewTab] = useState<'es' | 'en'>('es');
-  const [isTranslatingPreview, setIsTranslatingPreview] = useState(false);
   const tr = getT(locale);
 
   const selectedVoice = aiGenerated ? getVoiceById(aiGenerated.voice) : null;
   const voiceTrait = selectedVoice ? (locale === 'es' ? selectedVoice.trait : selectedVoice.traitEn) : '';
+
+  const [previewTab, setPreviewTab] = useState<'es' | 'en'>('es');
+  const [isTranslating, setIsTranslating] = useState(false);
 
   const handleGenerate = async () => {
     if (!aiInput.name && !aiInput.profileType && !aiInput.scenario) {
@@ -56,31 +57,29 @@ export function AiProfileCreator() {
       });
       const data = await res.json();
       if (data.success) {
-        setAiGenerated(data.profile);
-        setPreviewTab('es');
-        const pName = aiInput.profileType ? `${locale === 'es' ? 'Voz' : 'Voice'} ${aiInput.profileType} - ${aiInput.name}` : aiInput.name;
-        setProfileName(pName);
-        const voice = getVoiceById(data.profile.voice);
+        const profileEs = data.profile;
+        const profileEn = data.profileEn;
+
+        setAiGenerated(profileEs);
+        setProfileName(aiInput.profileType ? `${locale === 'es' ? 'Voz' : 'Voice'} ${aiInput.profileType} - ${aiInput.name}` : aiInput.name);
+
+        // Build ES text
+        const voice = getVoiceById(profileEs.voice);
         const trait = voice ? (locale === 'es' ? voice.trait : voice.traitEn) : '';
-        const text = buildProfileText(pName, aiInput.name, data.profile, voice?.name || '', trait);
-        setGeneratedText(text);
-        setGeneratedTextEn('');
-        // Auto-translate to English for preview (don't block the UI)
-        setIsTranslatingPreview(true);
-        fetch('/api/generate-en', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ apiKey: googleApiKey, profile: data.profile, announcerName: aiInput.name }),
-        })
-          .then(r => r.json())
-          .then(enData => {
-            if (enData.success && enData.text) {
-              setGeneratedTextEn(enData.text);
-            } else {
-              console.warn('EN translation failed:', enData.error);
-            }
-          })
-          .catch(err => console.warn('EN translation error:', err))
-          .finally(() => setIsTranslatingPreview(false));
+        const esText = buildProfileText(
+          aiInput.profileType ? `${locale === 'es' ? 'Voz' : 'Voice'} ${aiInput.profileType} - ${aiInput.name}` : aiInput.name,
+          aiInput.name, profileEs, voice?.name || '', trait,
+        );
+        setGeneratedText(esText);
+
+        // Build EN text if available
+        if (profileEn) {
+          const enText = buildProfileText(
+            `EN - ${aiInput.profileType ? `Voice ${aiInput.profileType}` : 'Voice'} - ${aiInput.name}`,
+            aiInput.name, profileEn, voice?.name || '', '',
+          );
+          setGeneratedTextEn(enText);
+        }
       } else {
         showToast(data.error || 'Error', 'error');
       }
@@ -96,8 +95,6 @@ export function AiProfileCreator() {
     try { await navigator.clipboard.writeText(textToCopy); showToast(tr.preview.copied, 'success'); }
     catch { showToast(tr.preview.copyFail, 'error'); }
   };
-
-  const [isTranslating, setIsTranslating] = useState(false);
 
   const handleSaveNotion = async () => {
     if (!aiGenerated || !generatedText) {
@@ -141,8 +138,25 @@ export function AiProfileCreator() {
       showToast(editingPageId ? tr.notion.updateSuccess : tr.notion.exportSuccess, 'success');
       setEditingPageId(null);
 
-      // After saving, generate English instructions and update the same page
-      if (googleApiKey) {
+      // If we have English text already, update the Notion page with it
+      if (googleApiKey && generatedTextEn) {
+        try {
+          await fetch('/api/notion', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'update-profile',
+              token: notionToken,
+              databaseId: notionDatabaseId,
+              pageId: savedPageId,
+              profile: {
+                language: 'Español / English',
+                englishInstructions: generatedTextEn,
+              },
+            }),
+          });
+        } catch { /* silent */ }
+      } else if (googleApiKey && !generatedTextEn) {
+        // Fallback: generate English separately if not available
         setIsTranslating(true);
         showToast(tr.form.translating, 'success');
         try {
@@ -152,7 +166,7 @@ export function AiProfileCreator() {
           });
           const enData = await enRes.json();
           if (enData.success && enData.text) {
-            // Update the Notion page with English instructions
+            setGeneratedTextEn(enData.text);
             await fetch('/api/notion', {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -167,12 +181,8 @@ export function AiProfileCreator() {
               }),
             });
             showToast(tr.form.translateDone, 'success');
-          } else {
-            showToast(tr.form.translateFail, 'error');
           }
-        } catch {
-          showToast(tr.form.translateFail, 'error');
-        }
+        } catch { /* silent */ }
         setIsTranslating(false);
       }
     } catch {
@@ -189,7 +199,6 @@ export function AiProfileCreator() {
   };
 
   const paces = ['natural', 'rapid-fire', 'the-drift', 'staccato'] as const;
-  const styles = ['vocal-smile', 'newscaster', 'whisper', 'empathetic', 'promo-hype', 'deadpan'] as const;
 
   // AI Input Form
   if (!showEditor) {
@@ -341,21 +350,7 @@ export function AiProfileCreator() {
                 <Label className="text-gray-300 text-sm flex items-center gap-2">
                   <Palette className="h-3.5 w-3.5 text-red-400" />{tr.form.style}
                 </Label>
-                <Select value={aiGenerated?.style || ''} onValueChange={v => { editField('style', v); handleRegenerateText(); }}>
-                  <SelectTrigger className="bg-zinc-800/50 border-zinc-700 text-white">
-                    <SelectValue placeholder={tr.form.stylePlaceholder} />
-                  </SelectTrigger>
-                  <SelectContent className="bg-zinc-900 border-zinc-700">
-                    {styles.map(s => (
-                      <SelectItem key={s} value={s} className="text-gray-200 focus:bg-red-500/10 focus:text-red-300">
-                        <div className="flex flex-col">
-                          <span>{tr.form.styles[s]} ({s})</span>
-                          <span className="text-xs text-gray-500">{tr.form.styleDescriptions[s]}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Input value={aiGenerated?.style || ''} onChange={e => { editField('style', e.target.value); handleRegenerateText(); }} placeholder={tr.form.stylePlaceholder} className="bg-zinc-800/50 border-zinc-700 text-white placeholder:text-zinc-600" />
               </CardContent>
             </Card>
             <Card className="bg-zinc-900/60 border-zinc-800/50">
@@ -370,10 +365,7 @@ export function AiProfileCreator() {
                   <SelectContent className="bg-zinc-900 border-zinc-700">
                     {paces.map(p => (
                       <SelectItem key={p} value={p} className="text-gray-200 focus:bg-red-500/10 focus:text-red-300">
-                        <div className="flex flex-col">
-                          <span>{tr.form.paces[p]} ({p})</span>
-                          <span className="text-xs text-gray-500">{tr.form.paceDescriptions[p]}</span>
-                        </div>
+                        {tr.paces[p] || p} ({p})
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -466,60 +458,57 @@ export function AiProfileCreator() {
                 <div className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
                 <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">{tr.preview.title}</h2>
               </div>
-              {generatedText ? (
-                <>
-                  {/* Tabs */}
-                  <div className="flex gap-1 bg-black/30 rounded-lg p-1">
-                    <button
-                      onClick={() => setPreviewTab('es')}
-                      className={`flex-1 text-xs font-medium py-2 px-3 rounded-md transition-all ${
-                        previewTab === 'es'
-                          ? 'bg-red-600 text-white shadow-sm'
-                          : 'text-gray-400 hover:text-gray-200 hover:bg-zinc-800/50'
-                      }`}
-                    >
-                      {tr.preview.tabEs}
-                    </button>
-                    <button
-                      onClick={() => setPreviewTab('en')}
-                      className={`flex-1 text-xs font-medium py-2 px-3 rounded-md transition-all ${
-                        previewTab === 'en'
-                          ? 'bg-red-600 text-white shadow-sm'
-                          : 'text-gray-400 hover:text-gray-200 hover:bg-zinc-800/50'
-                      }`}
-                    >
-                      {tr.preview.tabEn}
-                      {previewTab === 'en' && generatedTextEn && (
-                        <span className="ml-1.5 inline-flex items-center gap-0.5 text-[10px] text-green-400 font-normal">
-                          <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
-                          {tr.preview.recommendedForTTS}
-                        </span>
-                      )}
-                    </button>
-                  </div>
 
-                  {/* Tab content */}
-                  {previewTab === 'es' ? (
-                    <pre className="bg-black/40 border border-zinc-800 rounded-lg p-4 text-sm text-gray-200 whitespace-pre-wrap font-mono leading-relaxed overflow-x-auto">{generatedText}</pre>
-                  ) : isTranslatingPreview ? (
-                    <div className="flex items-center justify-center py-8 text-gray-500">
-                      <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                      <span className="text-sm">{tr.preview.translatingEn}</span>
-                    </div>
-                  ) : generatedTextEn ? (
-                    <pre className="bg-black/40 border border-green-900/30 rounded-lg p-4 text-sm text-gray-200 whitespace-pre-wrap font-mono leading-relaxed overflow-x-auto">{generatedTextEn}</pre>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center py-8 text-gray-600">
-                      <AudioLines className="h-8 w-8 mb-2 text-zinc-700" />
-                      <p className="text-xs text-center">{tr.preview.translatingEn}</p>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-12 text-gray-600">
-                  <AudioLines className="h-10 w-10 mb-3 text-zinc-700" />
-                  <p className="text-sm text-center">{tr.preview.noProfile}</p>
+              {/* ES / EN Tabs */}
+              {generatedText && (
+                <div className="flex gap-1 bg-zinc-800/50 rounded-lg p-1">
+                  <button
+                    onClick={() => setPreviewTab('es')}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-md text-sm font-medium transition-all ${
+                      previewTab === 'es'
+                        ? 'bg-red-500/15 text-red-400 border border-red-500/30'
+                        : 'text-gray-500 hover:text-gray-300 border border-transparent'
+                    }`}
+                  >
+                    {tr.preview.tabEs}
+                  </button>
+                  <button
+                    onClick={() => setPreviewTab('en')}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-md text-sm font-medium transition-all ${
+                      previewTab === 'en'
+                        ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                        : 'text-gray-500 hover:text-gray-300 border border-transparent'
+                    }`}
+                  >
+                    <Globe className="h-3.5 w-3.5" />
+                    {tr.preview.tabEn}
+                    {generatedTextEn && (
+                      <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded-full leading-none">
+                        TTS
+                      </span>
+                    )}
+                  </button>
                 </div>
+              )}
+
+              {previewTab === 'es' ? (
+                generatedText ? (
+                  <pre className="bg-black/40 border border-zinc-800 rounded-lg p-4 text-sm text-gray-200 whitespace-pre-wrap font-mono leading-relaxed overflow-x-auto">{generatedText}</pre>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-12 text-gray-600">
+                    <AudioLines className="h-10 w-10 mb-3 text-zinc-700" />
+                    <p className="text-sm text-center">{tr.preview.noProfile}</p>
+                  </div>
+                )
+              ) : (
+                generatedTextEn ? (
+                  <pre className="bg-black/40 border border-emerald-900/30 rounded-lg p-4 text-sm text-gray-200 whitespace-pre-wrap font-mono leading-relaxed overflow-x-auto">{generatedTextEn}</pre>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-12 text-gray-600">
+                    <Globe className="h-10 w-10 mb-3 text-zinc-700" />
+                    <p className="text-sm text-center">{tr.preview.noProfile}</p>
+                  </div>
+                )
               )}
             </CardContent>
           </Card>

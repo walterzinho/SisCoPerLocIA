@@ -18,6 +18,7 @@ export interface NotionProfile {
   tag: string;
   fullConfig: string;
   createdAt: string;
+  language?: string;
 }
 
 interface AiGenerated {
